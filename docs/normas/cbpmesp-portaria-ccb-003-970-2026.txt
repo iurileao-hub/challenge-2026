@@ -1,0 +1,102 @@
+Diário Oficial do Estado de São Paulo
+/governosp
+/governosp
+Diário Oficial
+ > 
+Executivo
+ > 
+Secretaria da Segurança Pública
+ > 
+PORTARIA Nº 003/970/2026, DE 17 DE MARÇO DE 2026
+VOLTAR
+COMPARTILHAR
+PDF CERTIFICADO
+Diário Oficial do Estado de São Paulo
+Publicado na Edição de 17 de Março de 2026
+ | Caderno Executivo
+ | Seção Atos Normativos
+PORTARIA Nº 003/970/2026, DE 17 DE MARÇO DE 2026
+SECRETARIA DA SEGURANÇA PÚBLICA
+POLÍCIA MILITAR DO ESTADO DE SÃO PAULO
+CORPO DE BOMBEIROS
+Portaria nº CCB-003/970/2026
+Atualiza a Instrução Técnica nº 41, que versa sobre inspeção visual em instalações elétricas de baixa tensão, para incluir sistemas de abastecimento de veículos elétricos (SAVE).
+O COMANDANTE DO CORPO DE BOMBEIROS DA POLÍCIA MILITAR DO ESTADO DE SÃO PAULO (CBPMESP), 
+no uso de suas atribuições, conferidas pela Lei Complementar n.º 1.257, de 6 de janeiro de 2015, que instituiu o Código Estadual de Proteção Contra Incêndios e Emergências, e
+Considerando
+ a constante necessidade de aprimoramento do Serviço de Segurança contra Incêndio, bem como o dever de promover a atualização e a adequação normativa em decorrência da publicação do Decreto Estadual nº 69.118, de 9 de dezembro de 2024, que instituiu o novo Regulamento de Segurança contra Incêndio das Edificações e Áreas de Risco do Estado de São Paulo;
+Considerando 
+a competência atribuída ao CBPMESP para edição de normas complementares relacionadas ao cumprimento das medidas de segurança contra incêndios;
+Considerando 
+a necessidade de adequar a legislação vigente para regularização de edificações e áreas de riscos de ocupação/uso “G” (garagens e serviços automotivos) com as necessidades apontadas por Comissão Especial de Estudos do Corpo de Bombeiros da Polícia Militar do Estado de São Paulo e Diretriz Nacional (CNCGBM/LIGABOM) sobre ocupações destinadas a garagens e locais com sistemas de alimentação de veículos elétricos (SAVE);
+Considerando
+, ademais, a conclusão da consulta pública sobre as alterações da Instrução Técnica nº 41 (Portaria nº CCB-008/800/2020, de 12 de novembro de 2025), após as comissões de estudo competentes terem analisado as sugestões recebidas e incorporado aquelas consideradas pertinentes e alinhadas à política institucional de segurança contra incêndio.
+RESOLVE:
+Artigo 1º
+ - Fica alterada a redação do item 3.1.1 da Instrução Técnica 41 vigente, para possibilitar um período de adequação das edificações:
+De:
+3.1.1 Para as edificações e áreas de risco existentes, quando da renovação do Auto de Vistoria do Corpo de Bombeiros (AVCB), as exigências dos subitens 5.1.1, 5.1.2, 5.1.3, 5.1.7, 5.1.8, 6.1 e 7 devem ser atendidas.
+Para:
+3.1.1 Para as edificações e áreas de risco existentes, quando da renovação do Auto de Vistoria do Corpo de Bombeiros (AVCB), as exigências dos subitens 5.1.1, 5.1.2, 5.1.3, 5.1.7, 5.1.8, 
+5.2 a 5.12, 
+6.1 e 7 devem ser atendidas.
+Artigo 2º
+ - Acrescentar os subitens 5.2 a 5.12 na Instrução Técnica 41 vigente:
+5.2 A responsabilidade de instalação e garantia de eficiência de locais onde haja Sistema de Alimentação de Veículos Elétricos (SAVE) caberá integralmente ao responsável técnico e/ou empresa instaladora que devem atender integralmente ao disposto nas seguintes normas:
+5.2.1 NBR 5410 - Instalações elétricas de baixa tensão;
+5.2.2 NBR 17019 - Instalações elétricas de baixa tensão – Requisitos para instalações em locais especiais - Alimentação de veículos elétricos;
+5.2.3 NBR IEC 61851-1 - Sistema de recarga condutiva para veículos elétricos - Parte 1: Requisitos gerais.
+5.3 Em áreas internas às edificações, admite-se somente a utilização dos modos 3 e 4 conforme a NBR IEC 61851-1.
+Figura 2: Esquema dos modos de carregamento (NBR IEC 61851-1)
+5.4 Todos os tipos de pontos de desligamento manual devem ser instalados em altura entre 0,90 m e 1,80 m do piso acabado.
+5.4.1 Deve haver ponto de desligamento manual de todos os SAVE, no mesmo pavimento a não mais de 5,00 metros da entrada principal da edificação, ou da entrada da garagem, ou das escadas nos pavimentos da garagem da edificação. Esta será denominada como chave de emergência de pavimento.
+5.4.2 Deve haver ponto de desligamento manual de todos os SAVE a não mais de 5,00 metros destes equipamentos. Esta será denominada como chave de emergência local.
+5.5 Os sistemas de alarme e de detecção de incêndio devem ser interligados aos pontos de desligamento, garantindo o desligamento automático de todos os SAVE imediatamente após o acionamento, seja este originado pela detecção ou pelo acionamento manual.
+5.6 Deve haver garantia da interrupção de energia entre os SAVE e a rede elétrica por meio de disjuntor no quadro de distribuição.
+5.6.1 Cada SAVE deve possuir circuito exclusivo com proteção individual por disjuntor e dispositivo DR (diferencial residual) de alta sensibilidade (30 mA), dos tipos A, F ou B, conforme a ABNT NBR 17019, instalado no quadro de distribuição ou incorporado à própria estação de recarga (Modo 3), sendo vedado o compartilhamento do dispositivo DR entre pontos de conexão distintos.
+5.6.2 Deve ser prevista proteção contra surtos (DPS) nos quadros que alimentam as estações de recarga.
+5.6.3 É vedada a conexão do SAVE diretamente nos terminais de conexão do disjuntor do padrão de entrada, mesmo em unidades consumidoras exclusivas.
+5.6.4 Os SAVE devem ser fisicamente protegidos com defensas ou outro sistema apropriado que evite danos originados por circulação de veículos ou impactos acidentais.
+5.6.5 É proibida a conexão de dispositivos para recarga veicular em tomadas comuns de uso geral, tal qual o uso de adaptadores ou extensões.
+5.7 Deve haver sistema de sinalização, referente à vaga que possua o SAVE, bem como junto aos pontos de desligamento e disjuntor(es) no quadro de distribuição, endereçando a posição de cada SAVE e o disjuntor correspondente.
+5.7.1 As placas devem ser instaladas entre 1,20 m e 1,90 m do piso acabado à base da sinalização.
+5.7.2 Quadro de distribuição: Placa retangular fotoluminescente com borda vermelha, dimensões mínimas 20x40 cm; no topo, triângulo amarelo com raio preto indicando risco elétrico; texto principal “Quadro de Distribuição dos SAVE” em negrito, seguido de “Recarga de Veículos Elétricos” em linha inferior, identificando o painel elétrico dedicado à alimentação e proteção dos circuitos do sistema de recarga, facilitando manutenção e segurança operacional.
+Figura 3: Sinalização de quadros de distribuição dos SAVE
+5.7.3 Estação de Recarga: Placa retangular fotoluminescente, dimensões mínimas 40x20 cm; fundo branco, e apresenta um ícone circular de fundo azul-escuro. A sinalização gráfica e o texto são em cor bege claro. No círculo azul, há um pictograma que representa uma bomba de abastecimento com um raio (símbolo de eletricidade) no corpo da bomba. Ao lado, pendurado, há um conector veicular específico de recarga. Abaixo do ícone circular, há uma tarja retangular azul-escura com texto em duas linhas: Linha Superior: SAVE (em letras maiúsculas e negrito). Linha Inferior: MODO (1, 2, 3 ou 4) (em letras menores), apontando o modo de recarga propriamente dito.
+Figura 4: Sinalização de estação de recarga
+5.7.4 Chave de desligamento de emergência (pavimento ou local): Placa retangular foto luminescente com fundo vermelho, dimensões mínimas 40x20 cm. Desenho de uma mão com o dedo indicador estendido, apontando para cima, em direção a um quadrado (representando o botão de emergência); o símbolo deve ser centralizado no painel vermelho superior. Na parte inferior, Linha 1: SAVE (Fonte Negrito, em letras maiúsculas). Linha 2: DESLIGAMENTO DO. Linha 3: SISTEMA DE. Linha 4: ALIMENTAÇÃO. Linha 5: DE VEÍCULO ELÉTRICO. O texto deve ser alinhado ao centro. A sigla "SAVE" deve ter um tamanho de fonte significativamente maior para destaque imediato.
+Figura 5: Sinalização de chave de desligamento de emergência
+5.7.5 Deve haver sinalização com instruções visíveis, em português e, quando aplicável, em outros idiomas, sobre:
+a. Procedimentos corretos de utilização;
+b. Localização dos dispositivos de desligamento manual;
+c. Procedimentos de emergência e acionamento do Corpo de Bombeiros;
+d. Contato para manutenção e suporte técnico.
+5.7.5.1 As instruções devem ser em placa fotoluminescente, com altura de leitura mínima de 12 mm, instaladas de 1,50 m a 1,80 m do piso acabado.
+5.8 Para edificações que possuem apenas uma rota de saída de emergência, as estações de recarga devem manter um afastamento de no mínimo 5,00 m.
+5.8.1 A distância necessária deve adotar como referência o perímetro de demarcação da vaga.
+5.9 É obrigatória a emissão de documento de responsabilidade técnica do profissional legalmente habilitado e responsável pela instalação e/ou manutenção do SAVE. Admite-se que tal documento contemple múltiplas atividades elétricas da edificação, desde que a responsabilidade específica pela instalação e/ou manutenção do SAVE esteja explicitamente consignada, devendo ainda:
+5.9.1 Deve ser consignado no campo observações do documento de responsabilidade técnica que se refere à conformidade do SAVE.
+5.9.2 Em caso de apresentação de projeto técnico de segurança contra incêndio, deverá haver nota específica em planta indicando o pavimento em que haverá os pontos SAVE bem como o atendimento das prescrições citadas nesta Instrução Técnica.
+5.9.3
+A comprovação da responsabilidade técnica referente ao SAVE deverá ocorrer em todas as formas de apresentação de projeto listadas na Instrução Técnica nº 1 vigente, independentemente da área, altura ou classificação da ocupação da edificação
+.
+5.9.4 A responsabilidade técnica sobre o SAVE compreende a elaboração de estudo de demanda e curva de carga, ratificando a viabilidade da infraestrutura — incluindo transformadores, condutores e proteções. O responsável técnico assegura a estrita observância à IT 41 e normas pertinentes, garantindo o dimensionamento dos modos de carga, a sinalização regulamentar e a integridade dos sistemas elétricos dos pontos de recarga.
+5.10 Os sistemas de comunicação sem fio utilizados nas estações de recarga (RFID, Bluetooth, Wi-Fi e similares) devem possuir homologação da ANATEL, conforme a regulamentação vigente.
+5.11 A verificação dos critérios desta Instrução Técnica, nas vistorias técnicas, será realizada de forma visual e por amostragem.
+5.12 Para edificações residenciais unifamiliares, recomenda-se a adoção das medidas de segurança para SAVE contidas na presente IT como uma iniciativa pautada nas boas práticas do setor.
+Artigo 3º
+ - Esta portaria entra em vigor na data de sua publicação.
+Este documento pode ser verificado pelo código
+2026.03.16.1.1.38.16.7.1.214.1709068
+em
+ https://www.doe.sp.gov.br/autenticidade
+VOLTAR
+©
+2026
+ | Diário Oficial do Estado de São Paulo | Todos os Direitos Reservados
+Desde maio de 1891
+Ouvidoria
+Transparência
+SIC
+Privacidade
+Diário Oficial do Estado de São Paulo

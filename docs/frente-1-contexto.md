@@ -121,7 +121,38 @@ Lendo as quatro soluções em conjunto, o mercado se divide em dois eixos: **exc
 <!-- a preencher -->
 
 ## Opção C — Análise de dados públicos
-<!-- a preencher -->
+
+Para testar com números o argumento central deste dossiê — a frota eletrificada cresce mais rápido do que a infraestrutura de recarga consegue acompanhar —, construímos uma análise quantitativa reproduzível em [`notebooks/frota_ev_brasil.ipynb`](../notebooks/frota_ev_brasil.ipynb). Três blocos de dados públicos: a série anual de emplacamentos da ABVE (transcrita manualmente dos releases oficiais, com a fonte de cada número comentada no código), as fotografias da rede pública de recarga da base ABVE/Tupi Mobilidade em três cortes temporais (fev/2025, ago/2025, fev/2026) e a base colaborativa Open Charge Map (1.298 pontos brasileiros, via espelho oficial `ocm-export` no GitHub) cruzada com a lista de municípios do IBGE. Os dados brutos ficam em `data/` e os gráficos são gerados pelo próprio notebook.
+
+### A frota: 19× em seis anos, e cada vez mais dependente de tomada
+
+Os emplacamentos anuais de eletrificados leves saltaram de 11.858 (2019) para 223.912 (2025) — fator de 18,9×, crescimento médio de +63% ao ano, contra +2,6% do mercado total em 2025 [ABVE, 2026]. Mais importante para o nosso problema: a composição mudou. A fatia plug-in (BEV+PHEV, os veículos que efetivamente dependem de tomada) era 41% das vendas em 2021, foi a 71% em 2024 e chegou a **81% em 2025** [ABVE, 2022; ABVE, 2026]. O crescimento da frota é, cada vez mais, crescimento direto de demanda por recarga.
+
+![Emplacamentos anuais de veículos eletrificados leves no Brasil, 2019-2025](../assets/frota-ev-vendas-anuais.png)
+
+### A rede pública: cresce rápido, mas é pequena e concentrada
+
+A base nacional ABVE/Tupi Mobilidade registrava 14.827 pontos públicos e semipúblicos em fev/2025, 16.880 em ago/2025 e 21.061 em fev/2026 — +42% em doze meses, com os carregadores rápidos (DC) crescendo 167% [ABVE, 2026b; ClimaInfo, 2025]. A distribuição, porém, é desigual: São Paulo concentra 28,3% da rede oficial (4.777 pontos), e SP+RJ+RS+DF somam mais da metade [AutoIndústria, 2026]; apenas 1.649 dos 5.571 municípios brasileiros (29,6%) têm algum ponto público [ABVE, 2026b]. Nossa agregação autoral da amostra Open Charge Map (1.237 pontos com UF identificada, recuperando a UF pelo município via IBGE quando o campo de estado vinha vazio) confirma o padrão na mesma direção: SP com 21,7%, SP+RJ+RS+DF com 45% e o Norte inteiro com 1,6% da amostra.
+
+![Distribuição de pontos de recarga por UF, amostra Open Charge Map](../assets/frota-ev-pontos-por-uf.png)
+
+### O gráfico-argumento: mesmo no melhor semestre da rede, a frota correu mais
+
+Entre ago/2025 e fev/2026 — o período de expansão mais rápida da história da rede pública — a frota plug-in circulante cresceu +36% (302.225 → 411.869 veículos) enquanto os pontos públicos cresceram +25% (16.880 → 21.061). Resultado: a razão **veículos plug-in por ponto público piorou de 17,9 para 19,6**, praticamente o dobro da referência de 10:1 que a própria ABVE adota como rede adequada [ABVE, 2026b; ClimaInfo, 2025]. Numerador e denominador explícitos: frota plug-in acumulada estimada ÷ pontos públicos e semipúblicos cadastrados — a razão não mede recarga residencial privada; mede a pressão sobre a infraestrutura compartilhada.
+
+![Razão veículos plug-in por ponto público de recarga](../assets/frota-ev-razao-veiculos-por-ponto.png)
+
+### Projeção ilustrativa: a pressão só aumenta
+
+Uma extrapolação geométrica simples — claramente ilustrativa, não previsão — dimensiona o que vem: mantido apenas o ritmo de 2025 (+26% a.a., o mais lento da série), entram ~283 mil eletrificados novos em 2026 e ~451 mil/ano em 2028; no ritmo do triênio 2022–2025 (+66% a.a.), seriam ~371 mil em 2026 e mais de 1 milhão/ano em 2028. A trajetória real depende de câmbio, tarifas de importação e política industrial, mas a ordem de grandeza é inequívoca em qualquer cenário.
+
+![Projeção ilustrativa de emplacamentos 2026-2028](../assets/frota-ev-projecao-ilustrativa.png)
+
+**Limitações declaradas:** ABVE/Tupi não publicam dataset estruturado (números transcritos de releases, conferidos contra duas fontes quando disponível); o Open Charge Map é colaborativo e cobre ~6% da base oficial (usado só para distribuição relativa, validada contra a oficial); os cortes temporais de frota e rede não coincidem perfeitamente; a projeção não modela variáveis exógenas. Detalhes no notebook.
+
+### Análise da equipe
+
+Os números fecham o argumento que as seções qualitativas vinham construindo. Primeiro, a demanda por recarga cresce mais rápido que a oferta pública mesmo no melhor momento da rede — e a razão de 19,6 veículos/ponto (quase 2× o referencial) significa fila, ocupação e inconveniência crescentes para quem depende de eletroposto. Segundo, a rede pública é geograficamente concentrada: fora de SP/RJ/RS/DF e fora das capitais, ela é rarefeita — 70% dos municípios não têm um único ponto. Terceiro, 81% dos veículos eletrificados vendidos hoje dependem de tomada. A consequência lógica das três curvas é que a recarga cotidiana recai sobre o lugar onde o carro dorme: a garagem do condomínio, do quartel, da empresa. É a quantificação da premissa do EV ChargeOps — a infraestrutura compartilhada privada vira o amortecedor do déficit público, e ela chega a esse papel **sem nenhuma camada de gestão**: sem medição por usuário, sem rateio auditável, sem fila organizada, sem controle do limite de potência predial (as dores da seção de desafios). Cada ponto da razão 19,6 que a rede pública não resolve é demanda empurrada para dentro do condomínio — e, portanto, para a plataforma que propomos.
 
 ## Fontes
 
@@ -162,3 +193,17 @@ Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09.
 20. NeoCharge — "Carregador para Carro Elétrico em Prédios e Condomínios". https://www.neocharge.com.br/tudo-sobre/carregador-carro-eletrico-predio-condominio-instalacao
 21. Governo do Paraná (AEN) — "Copel coloca em operação seu primeiro eletroposto com carregador ultrarrápido". https://www.parana.pr.gov.br/aen/Noticia/Copel-coloca-em-operacao-seu-primeiro-eletroposto-com-carregador-ultrarrapido
 22. App Store — "Eletroposto Fácil" (Copel). https://apps.apple.com/br/app/eletroposto-f%C3%A1cil/id1610189111
+
+### Opção C — análise de dados públicos
+
+Todas as fontes abaixo foram acessadas em 2026-06-09. Citações no texto: [ABVE, 2026] = fonte 23; [ABVE, 2026b] = fonte 25; [ABVE, 2022] = fonte 24.
+
+23. ABVE — "Eletrificados crescem dez vezes mais do que o conjunto do mercado, e vendas chegam a 224 mil veículos em 2025" (emplacamentos 2025/2024/2016 e divisão BEV/PHEV/HEV; mesma fonte 1). https://abve.org.br/eletrificados-crescem-dez-vezes-mais-do-que-conjunto-do-mercado-em-2025-com-224-mil-veiculos-vendidos/
+24. ABVE — "Eletrificados batem todas as previsões em 2021" (emplacamentos 2019–2021 e divisão por tecnologia em 2021). https://abve.org.br/eletrificados-batem-todas-as-previsoes-em-2021/
+25. ABVE — "Recarga pública rápida cresce 167% em um ano e chega a 31% dos 21 mil eletropostos da rede" (rede fev/2025 e fev/2026 com divisão AC/DC, municípios por região, frota plug-in de 411.869, razão 19,6 veículos/ponto e referência 10:1). https://abve.org.br/recarga-publica-rapida-cresce-167-em-12-meses-e-ja-atinge-31-dos-21-mil-eletropostos-da-rede/
+26. Fecombustíveis (reprodução de O Globo, 04/01/2024) — "Venda de carros eletrificados no Brasil cresce 91% em 2023 e atinge 93,9 mil emplacamentos" (emplacamentos 2022 e 2023, dados ABVE). https://www.fecombustiveis.org.br/noticia/venda-de-carros-eletrificados-no-brasil-cresce-91-em-2023-e-atinge-939-mil-emplacamentos/255655
+27. ClimaInfo — "Pontos de recarga de VEs crescem 59% no Brasil, mas distribuição é desigual" (rede ago/2025 de 16.880 pontos e frota plug-in de 302.225, dados ABVE/Tupi). https://climainfo.org.br/2025/09/18/pontos-de-recarga-de-ves-crescem-59-no-brasil-mas-distribuicao-e-desigual/
+28. Latam Mobility — "O Brasil alcança 16.880 pontos de recarga públicos e semipúblicos" (divisão AC/DC em 31/08/2025). https://latamobility.com/pt-br/o-brasil-alcanca-16-880-pontos-de-recarga-publicos-e-semipublicos-para-veiculos-eletricos/
+29. AutoIndústria — "A nova geografia da recarga elétrica no Brasil" (SP com 4.777 pontos, 28,3%; SP+RJ+RS+DF com mais da metade da rede). https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
+30. Open Charge Map — espelho oficial `ocm-export` no GitHub (1.298 pontos de recarga no Brasil, georreferenciados; a API oficial exige chave gratuita, o espelho não). https://github.com/openchargemap/ocm-export
+31. IBGE — API de localidades, lista oficial dos 5.571 municípios com UF e região. https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado

@@ -7,6 +7,8 @@ Fontes primárias usadas na Frente 2 (Opção A). Toda citação de artigo/item 
 |---|---|---|---|
 | `aneel-ren-1000-2021-dou.html` | Resolução Normativa ANEEL nº 1.000, de 7/12/2021 — texto original integral (DOU 20/12/2021, ed. 238, seção 1, p. 206) | ANEEL / Imprensa Nacional | https://www.in.gov.br/en/web/dou/-/resolucao-normativa-aneel-n-1.000-de-7-de-dezembro-de-2021-368359651 |
 | `aneel-ren-1000-2021-consolidada-2025-09.pdf` | REN 1.000/2021 — texto consolidado oficial da ANEEL (captura da página oficial em 29/09/2025) | ANEEL | https://www2.aneel.gov.br/cedoc/ren20211000.html ¹ |
+| `aneel-ren-819-2018-dou.html` | Resolução Normativa ANEEL nº 819, de 19/06/2018 — texto original integral (DOU 05/07/2018, ed. 128, seção 1, p. 70); revogada pela REN 1.000/2021, art. 677, LII | ANEEL / Imprensa Nacional | https://www.in.gov.br/materia/-/asset_publisher/Kujrw0TZC2Mb/content/id/28737289/do1-2018-07-05-resolucao-normativa-n-819-de-19-de-junho-de-2018-28737273 |
+| `aneel-noticia-cp-42-2025.html` | Notícia oficial da ANEEL, 09/12/2025 — abertura da Consulta Pública nº 42/2025 (contribuições de 11/12/2025 a 10/03/2026); **não é norma**, preservada como fonte oficial das datas da CP | ANEEL (gov.br) | https://www.gov.br/aneel/pt-br/assuntos/noticias/2025/aneel-abre-consulta-publica-para-aprimorar-regras-de-conexao-de-eletromobilidade-a-rede-eletrica |
 | `alesp-lei-18403-2026.html` | Lei estadual (SP) nº 18.403, de 18/02/2026 (texto retificado em 20/02/2026) | ALESP | https://www.al.sp.gov.br/repositorio/legislacao/lei/2026/lei-18403-18.02.2026.html |
 | `prefeitura-sp-lei-17336-2020.html` | Lei municipal (São Paulo) nº 17.336, de 30/03/2020 | Prefeitura de São Paulo — Catálogo de Legislação Municipal | https://legislacao.prefeitura.sp.gov.br/leis/lei-17336-de-30-de-marco-de-2020 |
 | `cbpmesp-portaria-ccb-008-800-2025.pdf` | Portaria nº CCB-008/800/2025, de 12/11/2025 — consulta pública da proposta de alteração da IT nº 41 (DOE-SP 13/11/2025) | CBPMESP | https://cbaplang.corpodebombeiros.sp.gov.br/Midias/638986232326891879.pdf |
@@ -27,6 +29,8 @@ anotações de alteração em outros pontos da norma.
 facilitar leitura e conferência offline; o HTML é a captura primária.
 
 ## Normas identificadas, texto não obtido
+
+Cada norma abaixo foi nomeada nominalmente (número e título verbatim) em documento oficial preservado acima — os itens 5.2.1–5.2.3 da IT-41 (Portarias CCB-008/2025 e CCB-003/2026); a Lei 18.403/2026 (art. 1º, § 1º, 2) exige conformidade com as normas da ABNT de forma genérica, sem citá-las nominalmente.
 
 | Norma | Por quê | Como foi referenciada |
 |---|---|---|

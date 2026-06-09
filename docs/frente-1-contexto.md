@@ -1,16 +1,121 @@
 # Frente 1 — Contexto e Problema
 
 ## Recarga compartilhada e desafios operacionais
-<!-- a preencher -->
+
+### Contexto: a frota eletrificada cresce mais rápido que a infraestrutura de gestão
+
+O Brasil fechou 2025 com 223.912 veículos eletrificados leves vendidos — recorde histórico e crescimento de 26% sobre 2024, dez vezes acima do mercado total (que cresceu 2,6%). Desses, 181.542 são plug-in (PHEV + BEV), ou seja, veículos que efetivamente dependem de tomada [ABVE, 2026]. Como a recarga cotidiana de um EV acontece majoritariamente onde o carro dorme, esse crescimento empurra o problema para dentro de condomínios residenciais, estacionamentos corporativos e campi — ambientes onde a energia é compartilhada, mas o consumo é individual.
+
+### Os desafios do gestor
+
+A literatura de mercado e a cobertura especializada convergem em um conjunto recorrente de dores de quem administra esses espaços:
+
+1. **Limite de potência da instalação.** Um EV em recarga AC pode consumir o equivalente a um apartamento inteiro com todos os eletrodomésticos ligados. Edifícios antigos não foram dimensionados para recargas simultâneas, e a entrada de energia do condomínio é um teto físico: sem gerenciamento, poucas recargas concorrentes podem derrubar o quadro geral [MyCond, 2026; Power2Go, 2026].
+2. **Rateio justo do consumo.** Quando o carregador é alimentado pela área comum, sem medição individualizada o custo da energia de poucos moradores é diluído na taxa condominial de todos — fonte direta de conflito em assembleia. A orientação dominante é que "a energia deve ser individualizada, evitando subsídios entre usuários e não usuários" [Lello Condomínios, 2026].
+3. **Disputa por carregadores compartilhados.** Quando a avaliação de carga conclui que só cabem um ou dois pontos coletivos, surge o problema de fila: tempo máximo de uso, agendamento, veículo que termina a recarga e continua ocupando a vaga. "Gerenciar a disponibilidade dos carregadores compartilhados pode se tornar complicado" à medida que a frota interna cresce [Power2Go, 2026].
+4. **Segurança e conformidade técnica.** A instalação exige laudo elétrico, ART de engenheiro habilitado e aderência às normas ABNT NBR 5410, NBR 17019 e NBR IEC 61851-1; em São Paulo, o Corpo de Bombeiros atualizou a IT-41 em novembro de 2025 com requisitos específicos para sistemas de alimentação de veículos elétricos (S.A.V.E.) [Lello Condomínios, 2026]. O síndico responde legalmente pela conformidade.
+5. **Governança e vácuo normativo.** A Lei estadual paulista nº 18.403/2026 garantiu ao condômino o direito de instalar ponto de recarga na vaga privativa às suas expensas, invertendo a lógica anterior (a negativa agora exige laudo técnico fundamentado). Mas a própria lei silencia sobre rateio de obras coletivas, vagas rotativas e impactos da instalação individual na capacidade futura dos demais — lacunas que recaem sobre o gestor [Migalhas, 2026].
+
+### Análise da equipe
+
+O padrão que emerge dessas fontes é claro: o gargalo não é mais o hardware (carregadores AC residenciais são commodity), e sim a **camada de gestão** — quem usou, quanto usou, quanto deve, quem carrega agora e quanto a instalação aguenta. A Lei 18.403/26 acelera a adoção (facilita instalar) sem resolver a operação (não diz como gerir), ampliando exatamente a lacuna que o EV ChargeOps ataca: sessões identificadas por usuário, kWh individual medido, rateio automático e auditável, e gestão de disponibilidade. O fato de o síndico responder legalmente pela conformidade também sugere um requisito de produto pouco óbvio: relatórios exportáveis que sirvam de prestação de contas em assembleia.
 
 ## Anatomia técnica de uma sessão de recarga
-<!-- a preencher -->
+
+Entender o que acontece entre "plugar o cabo" e "receber a conta" é pré-requisito para projetar a plataforma: cada etapa do ciclo gera eventos e medições que são a matéria-prima do EV ChargeOps.
+
+### Ciclo de vida de uma sessão (recarga AC, Modo 3)
+
+1. **Plug-in e detecção.** O conector é inserido. O carregador (EVSE) detecta a presença do veículo pelo circuito *Control Pilot* (CP): o veículo altera a resistência entre CP e terra, sinalizando os estados padronizados — A (sem veículo), B (veículo detectado), C (pronto para carregar) [Wikipedia/SAE J1772, acesso 2026].
+2. **Negociação de corrente.** A norma IEC 61851 define quatro modos de carga (Modo 1: tomada comum sem controle; Modo 2: cabo com proteção embarcada; Modo 3: estação AC dedicada com sinalização completa; Modo 4: recarga DC com carregador externo) [Monta, 2026]. No Modo 3, o EVSE gera no CP uma onda quadrada de 1 kHz a ±12 V, e o *duty cycle* do PWM codifica a corrente máxima permitida (ex.: 25% ≈ 16 A, 50% ≈ 32 A) [Wikipedia/SAE J1772, acesso 2026]. É por esse mecanismo que sistemas de balanceamento de carga reduzem dinamicamente a corrente de cada vaga quando o prédio se aproxima do limite.
+3. **Autenticação e autorização.** Quem paga precisa ser identificado antes de liberar energia. Os métodos usuais: cartão RFID encostado no leitor, aplicativo (QR code ou seleção do ponto) ou, nos sistemas mais novos, **Plug & Charge** da ISO 15118 — o veículo e o carregador trocam certificados digitais e a autenticação acontece automaticamente ao conectar o cabo, sem nenhuma ação do motorista [Wikipedia/ISO 15118, acesso 2026]. A ISO 15118 define a camada de comunicação digital de alto nível (identificação segura, smart charging, V2G) que opera sobre a base elétrica da IEC 61851.
+4. **Energização e medição contínua.** Autorizada a sessão, o contator fecha e a energia flui. O medidor embarcado registra continuamente energia acumulada (kWh), potência instantânea (kW), corrente, tensão e duração. Em equipamentos voltados a cobrança, a medição é certificada (ex.: MID na Europa, citada pela Zaptec como base de faturamento) [Zaptec, 2026].
+5. **Encerramento.** A sessão termina por bateria cheia, desconexão do cabo, comando remoto ou regra de negócio (tempo máximo). O EVSE registra o motivo do encerramento e a leitura final do medidor.
+6. **Registro e cobrança.** O consumo da sessão (kWh entre leitura inicial e final), atribuído ao usuário autenticado, vira o lançamento de cobrança ou rateio.
+
+### Como os eventos chegam ao software: OCPP
+
+O elo entre o carregador e a plataforma de gestão é o **OCPP (Open Charge Point Protocol)**, padrão aberto mantido pela Open Charge Alliance que permite que carregadores de diferentes fabricantes se integrem a sistemas de outros fornecedores [CanalVE, 2026]. Na versão 1.6J (a mais difundida), a comunicação é JSON sobre WebSocket e o ciclo acima se materializa em mensagens [OCPP.md, 2026]:
+
+- `BootNotification` / `Heartbeat` — o carregador se apresenta ao sistema central e mantém keepalive;
+- `Authorize` — envia o `idTag` (credencial RFID/app) para validação;
+- `StartTransaction` — abre a sessão com conector, idTag, leitura inicial do medidor e timestamp; o sistema central devolve o `transactionId`;
+- `MeterValues` — telemetria periódica durante a recarga (energia, potência, tensão, corrente), em intervalo configurável;
+- `StopTransaction` — fecha a sessão com leitura final, timestamp e motivo do encerramento;
+- `StatusNotification` — transições de estado do conector (Preparing, Charging, Finishing, Available).
+
+No OCPP 2.0.1, esse fluxo é consolidado na mensagem única `TransactionEvent` (Started/Updated/Ended). A alternativa ao OCPP são APIs proprietárias de fabricante — caminho que cria *lock-in*, como se verá na análise da Zaptec na Opção A. A interoperabilidade via protocolos abertos é tema da agenda regulatória brasileira de recarga e será aprofundada na Frente 2.
+
+### Análise da equipe
+
+Para o EV ChargeOps, a consequência prática é direta: **o modelo de dados da plataforma já está praticamente desenhado pelo OCPP**. Uma "sessão" no nosso domínio mapeia 1:1 para o trio StartTransaction → MeterValues → StopTransaction, com usuário (idTag), ponto (connectorId), energia (meterStart/meterStop) e linha do tempo de potência. Projetar as entidades internas espelhando esse vocabulário garante compatibilidade com qualquer carregador OCPP e evita dependência de fabricante. Além disso, os `MeterValues` periódicos são o insumo natural da camada de IA operacional (detecção de anomalia de consumo, previsão de pico, sugestão de janelas de recarga) — sem custo adicional de instrumentação, pois o protocolo já entrega a telemetria.
 
 ## Modelos de negócio
-<!-- a preencher -->
+
+### Base regulatória: preço livre
+
+No Brasil, a recarga de veículos elétricos é atividade liberada a qualquer interessado, "inclusive para fins de exploração comercial com preços livremente negociados". A regra foi inaugurada pela REN ANEEL 819/2018 e hoje está consolidada no capítulo V da REN ANEEL 1.000/2021, que a revogou. A ANEEL adota regulação mínima: protege a rede elétrica e os demais consumidores, mas não tabela o preço da recarga [ANEEL, 2026]. Isso significa que o modelo de monetização é decisão de produto, não imposição regulatória — e o mercado pratica todos os formatos abaixo.
+
+### Os cinco modelos praticados
+
+1. **Gratuito (recarga como amenidade).** Comum em shoppings e supermercados, que usam o carregador como diferencial para atrair clientes [GreenV, 2026]. O "pagamento" é indireto: tempo de permanência e fidelização. Em condomínios, equivale a diluir o custo na taxa condominial — exatamente o cenário de rateio injusto descrito na seção de desafios.
+2. **Por kWh (paga-se a energia).** O usuário paga proporcionalmente à energia recebida. Não existe preço nacional de referência; cada estação define o seu, variando por rede e localidade [Carregados, 2026]. É o modelo mais justo do ponto de vista de consumo, mas não desincentiva o "carro-tampão" que termina a recarga e segue ocupando a vaga.
+3. **Por tempo (paga-se a ocupação).** O usuário paga por minuto conectado. Exemplo real: a rede pública da Copel no Paraná cobra de R$ 0,44/min a R$ 5,82/min conforme a potência do carregador (22, 60 ou 150 kW) [Governo do Paraná, 2025]. Resolve a ocupação ociosa, mas penaliza veículos que carregam mais devagar (pagam mais pelos mesmos kWh).
+4. **Assinatura/plano.** Mensalidade fixa com acesso à rede ou franquia de recargas [GreenV, 2026]. Frequentemente combinada com tarifas por uso (modelo híbrido). A interoperabilidade entre redes — como a parceria Zletric + VoltBras, que unificou cadastro e pagamento em mais de 2.500 eletropostos [Zletric, 2026] — aumenta o valor percebido da assinatura.
+5. **Rateio condominial.** Específico do contexto compartilhado: a plataforma mede o kWh de cada morador e fecha uma "fatura" mensal individual, que entra no boleto do condomínio ou é cobrada diretamente. É o modelo da NeoCharge para prédios ("mede quanto cada morador utilizou de energia e depois faz a divisão ao final de cada mês") [NeoCharge, 2026] e da ChargePoint nos EUA, que fatura o morador diretamente e reembolsa o condomínio pelo custo da energia [ChargePoint, 2026].
+
+Modelos mistos são comuns: taxa de ativação + kWh, kWh + multa de ociosidade após o fim da recarga, assinatura + tarifa reduzida.
+
+### Análise da equipe
+
+Para o EV ChargeOps, a lição central é que **o motor de tarifação precisa ser configurável, não fixo**: o mesmo condomínio pode querer kWh puro para moradores, tarifa por tempo para visitantes e multa de ociosidade nos horários de pico — e a regulação brasileira permite tudo isso. O modelo 5 (rateio) é o menos atendido por soluções genéricas e o mais aderente ao nosso público; os modelos 2 e 3 mostram que a plataforma deve registrar tanto kWh quanto duração de ocupação por sessão (dados que o OCPP já fornece), permitindo compor tarifas híbridas. Há ainda uma oportunidade analítica: com dados de sessão por usuário, a plataforma pode simular para o síndico quanto cada modelo arrecadaria antes de adotá-lo — uma funcionalidade de decisão que nenhuma das soluções mapeadas na Opção A oferece.
 
 ## Opção A — Análise de mercado
-<!-- a preencher -->
+
+Mapeamos quatro soluções existentes que tangenciam o problema do EV ChargeOps, escolhidas por cobrirem quadrantes diferentes do mercado: hardware premium europeu para edifícios (Zaptec), plataforma global integrada (ChargePoint), player nacional de condomínios (NeoCharge) e rede pública de concessionária brasileira (Copel/Eletroposto Fácil).
+
+### Zaptec (Noruega) — Zaptec Pro + Zaptec Portal
+
+- **Problema que resolve:** recarga coletiva em prédios residenciais e associações habitacionais sem upgrade caro da entrada de energia.
+- **Funcionalidades principais:** balanceamento dinâmico de carga e de fases patenteado (distribui a potência disponível entre os veículos sem sobrecarregar a instalação, alternando entre mono e trifásico por carro); escala de 2 a 1.000+ pontos; medição certificada MID para faturamento; gestão via Zaptec Portal na nuvem (gratuito); conectividade Wi-Fi/PLC/4G; autenticação por app e cartão [Zaptec, 2026].
+- **Modelo de negócio:** venda de hardware (estação + backplate de pré-instalação) com portal de gestão incluído sem mensalidade — o software é isca para o hardware [Zaptec, 2026].
+- **Limitações:** o suporte a OCPP é parcial por desenho: no modo OCPP 1.6J direto, o carregador perde o balanceamento proprietário de carga/fases ("não inclui os recursos avançados proprietários de balanceamento"); no modo OCPP Cloud, o balanceamento fica, mas o smart charging via OCPP é bloqueado — a otimização energética permanece presa à nuvem da Zaptec [Zaptec Docs, 2026]. Ou seja: o melhor recurso do produto não funciona fora do ecossistema do fabricante. *Análise da equipe:* a empresa é focada no mercado europeu, sem canal oficial de operação no Brasil divulgado, e não oferece rateio condominial nos moldes brasileiros (boleto/assembleia).
+
+### ChargePoint (EUA) — solução para condomínios e HOAs
+
+- **Problema que resolve:** recarga residencial para quem mora em apartamento, com cobrança individual e sem custo de energia para o condomínio.
+- **Funcionalidades principais:** hardware dedicado por cenário (CPF50 para vaga fixa de morador, CP6000 para vagas de visitantes, Home Flex para vaga com medidor próprio); *Power Sharing* para evitar upgrade elétrico; dashboard na nuvem com visibilidade em tempo real, consumo, emissões e custos; controle de acesso por grupo (morador/visitante); **cobrança direta ao morador com reembolso do custo de energia ao condomínio** [ChargePoint, 2026].
+- **Modelo de negócio:** hardware + assinatura de software na nuvem (ChargePoint Cloud) + serviços de suporte/garantia. Em 2026 a empresa passou a cobrar também **taxa de serviço por sessão** do motorista (US$ 0,25–0,99), somada ao preço definido pelo dono da estação [EV Connect, 2026].
+- **Limitações:** as taxas por sessão de 2026 geraram reação negativa documentada — custos imprevisíveis para o motorista, desincentivo ao uso casual e risco de imagem para o anfitrião que anunciava recarga barata [EV Connect, 2026]. *Análise da equipe:* além do custo recorrente de assinatura por porta, a solução condominial completa não opera no Brasil; o fluxo de "reembolso ao condomínio" pressupõe o sistema bancário/imobiliário norte-americano e não conversa com a realidade de boleto condominial e convenção de condomínio brasileiras.
+
+### NeoCharge (Brasil) — carregadores smart + Plataforma de Gestão de Recarga
+
+- **Problema que resolve:** instalação e gestão de recarga em condomínios, empresas e eletropostos brasileiros, incluindo a divisão do consumo entre moradores.
+- **Funcionalidades principais:** carregadores wallbox conectados; plataforma que registra cobranças por recarga, disponibilidade por estação, recargas por conector e energia utilizada; controle remoto (reiniciar, desativar, interromper recarga); medição por usuário com rateio mensal ("mede quanto cada morador utilizou e faz a divisão ao final de cada mês"); app para o usuário final com histórico e acompanhamento [NeoCharge, 2026; NeoCharge Condomínios, 2026].
+- **Modelo de negócio:** híbrido — venda de hardware próprio + assinatura da plataforma de gestão + serviços opcionais (instalação, manutenção, monitoramento) [NeoCharge, 2026].
+- **Limitações:** *análise da equipe, por ausência de documentação pública em contrário:* o material institucional não documenta conformidade OCPP da plataforma de gestão nem abertura de API — o pacote pressupõe hardware da própria NeoCharge, configurando risco de lock-in vertical (quem já tem carregadores de outra marca não aproveita a plataforma); não há menção a funcionalidades de inteligência operacional (previsão de demanda, detecção de anomalias, otimização de janelas); preços não são públicos, dificultando comparação de TCO pelo síndico.
+
+### Copel EV / Eletroposto Fácil (Brasil) — rede pública de concessionária
+
+- **Problema que resolve:** ansiedade de autonomia em deslocamentos intermunicipais — rede pública de recarga ao longo de 1.246 km de "eletrovia" no Paraná, com 32 carregadores, incluindo unidade ultrarrápida de 150 kW em Curitiba [Governo do Paraná, 2025].
+- **Funcionalidades principais:** app Eletroposto Fácil com mapa de carregadores, disponibilidade em tempo real, **reserva de conector**, acompanhamento da recarga com energia e custo em tempo real, histórico e estatísticas [App Store, 2026].
+- **Modelo de negócio:** cobrança por tempo (R$ 0,44/min a R$ 5,82/min conforme a potência), com pagamento processado via app de parceiro (Lex Mobility) [Governo do Paraná, 2025]. Nasceu de programa de inovação aberta da concessionária (Copel Volt).
+- **Limitações:** o app tem nota 3,8/5 na App Store, com reclamações de erro no cadastro, estações fora de operação sem sinalização e falta de suporte local [App Store, 2026]. A cobrança por minuto penaliza veículos com carregador AC mais lento. *Análise da equipe:* é uma solução de corredor rodoviário, não de gestão compartilhada — não há noção de rateio, de grupo fechado de usuários nem de limite de potência predial; entra no mapa como referência de UX pública (reserva de conector é uma boa ideia importável) e como evidência de que disponibilidade/manutenção é o calcanhar de aquiles operacional de redes reais.
+
+### Tabela comparativa
+
+| Dimensão | Zaptec | ChargePoint | NeoCharge | Copel EV |
+|---|---|---|---|---|
+| **Problema que resolve** | Recarga coletiva em prédios europeus sem upgrade elétrico | Recarga em condomínios/HOAs com cobrança individual (EUA) | Recarga e rateio em condomínios e empresas brasileiras | Recarga pública em corredor rodoviário (PR) |
+| **Funcionalidades principais** | Balanceamento dinâmico de carga/fases, portal cloud gratuito, medição MID, 2→1.000+ pontos | Power Sharing, dashboard cloud, cobrança direta ao morador + reembolso, perfis morador/visitante | Medição por usuário, rateio mensal, controle remoto de estações, app do usuário | Mapa + reserva de conector, recarga e custo em tempo real, 150 kW ultrarrápido |
+| **Modelo de negócio** | Venda de hardware; software incluso | Hardware + assinatura cloud + taxa por sessão (2026) | Hardware + assinatura da plataforma + serviços | Cobrança por minuto (R$ 0,44–5,82/min), pagamento via app parceiro |
+| **Limitações conhecidas** | OCPP parcial: balanceamento só na nuvem proprietária; sem operação BR; sem rateio condominial BR* | Taxas por sessão opacas e mal recebidas; assinatura por porta; solução condominial não opera no BR* | Sem OCPP/API documentados → lock-in vertical; sem IA operacional; preço não público* | App 3,8/5, estações inativas, suporte deficiente; cobrança por minuto penaliza AC lento |
+
+\* Itens marcados derivam de análise da equipe sobre ausência de oferta/documentação pública, não de fonte que afirme a limitação.
+
+### Análise da equipe — a lacuna que o EV ChargeOps ataca
+
+Lendo as quatro soluções em conjunto, o mercado se divide em dois eixos: **excelência de hardware/energia** (Zaptec resolve o limite de potência melhor que todos, mas prende a inteligência na própria nuvem) e **excelência de operação comercial** (ChargePoint resolve a cobrança individual melhor que todos, mas a custo recorrente alto e fora do contexto jurídico brasileiro). O player nacional (NeoCharge) é o mais próximo do nosso problema, porém empacota gestão com hardware próprio e não exibe camada analítica. Nenhuma das quatro oferece, simultaneamente: (1) **rateio condominial nativo do Brasil** — integrado a boleto, assembleia e à realidade da Lei 18.403/26; (2) **neutralidade de hardware via OCPP** — funcionar com qualquer carregador compatível, evitando o lock-in que Zaptec e NeoCharge praticam por desenho; e (3) **IA operacional sobre a telemetria** — previsão de pico contra a demanda contratada, detecção de anomalia de consumo, sugestão de janelas e simulação de modelos tarifários. Essa interseção vazia é o posicionamento do EV ChargeOps. O contraexemplo da Copel acrescenta um alerta de execução: plataforma sem operação confiável (estações inativas, suporte ausente) destrói a confiança do usuário mais rápido do que qualquer funcionalidade a constrói — monitoramento de saúde dos pontos (via Heartbeat/StatusNotification do OCPP) deve ser tratado como funcionalidade de primeira classe, não acessório.
 
 ## Opção B — Pesquisa com usuários
 <!-- a preencher -->
@@ -19,4 +124,41 @@
 <!-- a preencher -->
 
 ## Fontes
-<!-- a preencher -->
+
+### Frente 1 — corpo e Opção A
+
+Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09.
+
+**Contexto e desafios operacionais**
+
+1. ABVE — "Eletrificados crescem dez vezes mais do que o conjunto do mercado, e vendas chegam a 224 mil veículos em 2025". https://abve.org.br/eletrificados-crescem-dez-vezes-mais-do-que-conjunto-do-mercado-em-2025-com-224-mil-veiculos-vendidos/
+2. Migalhas — "Lei 18.403/26 de SP: Recarga de veículos elétricos em condomínios". https://www.migalhas.com.br/coluna/migalhas-edilicias/452093/lei-18-403-26-de-sp-recarga-de-veiculos-eletricos-em-condominios
+3. MyCond — "Desafios para Carregadores de Carros Elétricos em Condomínios". https://mycond.com.br/desafios-para-carregadores-de-carros-eletricos-em-condominios/
+4. Lello Condomínios — "Veículos elétricos em condomínios: o que diz a legislação". https://www.lellocondominios.com.br/veiculos-eletricos-em-condominios-o-que-diz-a-legislacao-como-instalar-e-quais-cuidados-os-sindicos-precisam-ter/
+5. Power2Go — "Condomínios: carregadores individuais ou compartilhados?". https://www.power2go.com.br/post/condom%C3%ADnios-carregadores-individuais-ou-compartilhados
+
+**Anatomia técnica da sessão**
+
+6. Monta — "IEC 61851: Definition, scope, and role in EV charging". https://monta.com/en/blog/iec-61851/
+7. Wikipedia — "SAE J1772" (sinalização Control Pilot/PWM compartilhada com IEC 61851 Modo 3). https://en.wikipedia.org/wiki/SAE_J1772
+8. Wikipedia — "ISO 15118" (Plug & Charge, V2G). https://en.wikipedia.org/wiki/ISO_15118
+9. OCPP.md — "OCPP 1.6J — Open Charge Point Protocol (JSON over WebSocket)". https://ocpp.md/ocpp-1.6j/
+10. CanalVE — "Como funciona o protocolo OCPP na recarga de carros elétricos?". https://canalve.com.br/como-funciona-o-protocolo-ocpp-nas-recargas-de-carros-eletricos/
+
+**Modelos de negócio**
+
+11. ANEEL — "Veículos Elétricos" (REN 819/2018 e REN 1.000/2021, preços livremente negociados). https://www.gov.br/aneel/pt-br/assuntos/veiculos-eletricos
+12. Carregados — "Quanto custa para carregar um carro elétrico no Brasil?". https://carregados.com.br/quanto-custa-para-carregar-um-carro-eletrico
+13. GreenV — "Eletroposto: o que é, como funciona e quanto custa abastecer". https://www.greenv.com.br/blog/eletroposto-o-que-e-como-funciona-e-quanto-custa-abastecer/
+14. Zletric — "Zletric e VoltBras criam rede com mais de 2.500 eletropostos interoperáveis no Brasil". https://www.zletric.com.br/post/zletric-e-voltbras-criam-rede-com-mais-de-2500-eletropostos-interoperaveis-no-brasil
+
+**Opção A — soluções analisadas**
+
+15. Zaptec — "Zaptec Pro". https://www.zaptec.com/charging-solutions/business-and-commercial/zaptec-pro
+16. Zaptec Docs — "OCPP within Zaptec". https://docs.zaptec.com/docs/ocpp-within-zaptec
+17. ChargePoint — "EV Charging Solutions for Condo Managers and HOAs". https://www.chargepoint.com/solutions/condos
+18. EV Connect — "New ChargePoint Fees: What's Changing and Who Pays More". https://www.evconnect.com/blog/chargepoint-raises-fees-in-2026/
+19. NeoCharge — "Plataforma de Gestão de Recarga". https://www.neocharge.com.br/plataforma-gestao-recarga
+20. NeoCharge — "Carregador para Carro Elétrico em Prédios e Condomínios". https://www.neocharge.com.br/tudo-sobre/carregador-carro-eletrico-predio-condominio-instalacao
+21. Governo do Paraná (AEN) — "Copel coloca em operação seu primeiro eletroposto com carregador ultrarrápido". https://www.parana.pr.gov.br/aen/Noticia/Copel-coloca-em-operacao-seu-primeiro-eletroposto-com-carregador-ultrarrapido
+22. App Store — "Eletroposto Fácil" (Copel). https://apps.apple.com/br/app/eletroposto-f%C3%A1cil/id1610189111

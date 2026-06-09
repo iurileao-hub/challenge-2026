@@ -10,7 +10,7 @@
 | Campo | Valor |
 |---|---|
 | Identificador | E_ |
-| Perfil | morador-EV / morador-potencial / gestor (ou combinação) |
+| Perfil | morador-EV / morador-potencial / gestor (ou combinação). "Morador-potencial" = mora em condomínio e considera ter um EV, ou aluga EV com frequência (conforme definição do roteiro) |
 | Faixa etária | |
 | Tipo de moradia/atuação | (ex.: apto em condomínio 80 unidades; gestor de estacionamento) |
 | Tem EV ou híbrido plug-in? | sim / não / pretende |
@@ -45,7 +45,7 @@
 
 **Síntese:**
 
-## Bloco B — Morador / motorista de EV
+## Bloco B — Morador / motorista (EV ou potencial)
 *(preencher apenas se o perfil incluir morador/motorista; senão, marcar N/A no bloco)*
 
 ### P5. Carregar em casa vs. ponto compartilhado — como decidiria

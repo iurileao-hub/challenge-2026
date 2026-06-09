@@ -24,7 +24,9 @@ específicos se o tempo permitir — registre isso no perfil.
 
 ## Instruções de aplicação
 
-1. **Duração:** 15 a 20 minutos. Presencial ou por chamada (vídeo ou voz).
+1. **Duração:** 15 a 20 minutos. Presencial ou por chamada (vídeo ou voz). Se o
+   entrevistado for perfil misto (morador E gestor, respondendo Blocos B e C), planeje
+   25 a 30 minutos ou divida em duas conversas.
 2. **Antes de começar:** explique que é uma pesquisa acadêmica (FIAP), que a identidade
    da pessoa não será publicada e peça permissão para anotar (ou gravar, se for transcrever
    depois). Anote o perfil: faixa etária, tipo de moradia/atuação, tem EV ou não, função
@@ -49,8 +51,10 @@ específicos se o tempo permitir — registre isso no perfil.
 - **Aprofunde com "por quê?" e "me dá um exemplo?"** quando a resposta for vaga.
 - **Siga a ordem dos blocos:** comportamento atual (Bloco A) vem antes de perguntas sobre
   a solução futura — isso evita que a pessoa responda o que acha que você quer ouvir.
-- Pule uma pergunta se ela claramente não se aplica (registre "N/A" no template), mas não
-  pule o fechamento (P15) — é a pergunta que costuma render os melhores insights.
+- Pule uma pergunta se ela claramente não se aplica (registre "N/A" no template — ex.:
+  P8, quanto pagaria a mais, pode não se aplicar a quem já descartou usar o ponto
+  compartilhado), mas não pule o fechamento (P15) — é a pergunta que costuma render os
+  melhores insights.
 
 ## Perguntas
 
@@ -67,7 +71,7 @@ específicos se o tempo permitir — registre isso no perfil.
 - **P4.** No lugar onde você mora ou atua, como os custos de energia das áreas comuns
   são divididos hoje? Você sabe como esse valor é calculado?
 
-### Bloco B — Morador / motorista de EV (atual ou potencial)
+### Bloco B — Morador / motorista (EV ou potencial)
 
 - **P5.** Se você pudesse carregar em casa (tomada própria) ou num ponto compartilhado
   do condomínio, como você decidiria qual usar? O que entraria nessa conta?

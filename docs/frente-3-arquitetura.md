@@ -156,7 +156,381 @@ O dataset escolhido é o sugerido pelo enunciado (§ 7.4): *Electric Vehicle Cha
 O critério da rubrica tem um teste prático que aplicamos a nós mesmos: **decorativo é o que se remove sem ninguém notar**. Removida a IA desta plataforma, quebram entregáveis nomeados — o alerta de saturação do painel, a estimativa de payback que embasa a assembleia do segundo carregador, o anexo de curva de carga da renovação do AVCB, a fila de auditoria que protege a fatura e a manutenção preditiva que responde ao caso Copel. Nenhum desses é um gráfico bonito ao lado do produto; são funções pelas quais gestor e morador tomam decisões com consequência financeira. A escolha por métodos clássicos e interpretáveis não é conformismo com a máquina modesta. É coerência com a tese da Opção A de que, em condomínio, auditabilidade vale mais que sofisticação. Um gradient boosting com features de calendário se explica em assembleia; uma rede neural, não. O risco que registramos com a mesma franqueza: modelos calibrados em dado sintético derivado de um campus americano de 2014–2015 nascem errados em algum grau, e o produto trata isso como propriedade declarada (aviso de calibração, métrica de quando confiar) em vez de esconder. A aposta verificável da Sprint 2 é, portanto, dupla: que o pipeline previsão + anomalia rode de ponta a ponta sobre o esquema da Opção C em infraestrutura mínima, e que a transição sintético → real exija troca de dados, não refatoração — exatamente o mesmo desenho de adaptador plugável que a Frente 2 adotou para a API do fabricante.
 
 ## Opção C — Esquema da base de dados
-<!-- a preencher -->
+
+> **Método.** Esta seção é o contrato central da Sprint 2: o motor de rateio (Opção A), as abordagens de IA (Opção B), o gerador de dados sintéticos e a camada de ingestão plugável (Frente 2) leem e escrevem **estas tabelas**. O esquema foi derivado de trás para frente — primeiro listamos tudo o que a fórmula de rateio, os casos excepcionais e as três abordagens de IA exigem dos dados; depois desenhamos as entidades que satisfazem essas exigências; por fim verificamos campo a campo (tabela de rastreabilidade abaixo) e rodamos um mês fictício completo, com a aritmética conferida por script em aritmética decimal half-up. Nenhuma fonte externa nova: o material é todo derivação interna do dossiê.
+
+### Decisões de modelagem
+
+1. **Nomenclatura em inglês, glosa em português.** *Decisão da equipe:* entidades e colunas em inglês (`charging_session.energy_kwh`, não `sessao.kwh_entregue`). Três razões: o esquema vira código na Sprint 2 e identificadores com acento ou cedilha são fonte de bug; o contrato espelhado da Frente 2 já nasceu em inglês (`session_start`, `energy_kwh`, `auth_id`...) e mantê-lo evita uma camada de tradução; e o modelo interno é OCPP-compatível por decisão da Frente 2, e o vocabulário OCPP é inglês. O mapeamento para os nomes em português usados no restante do dossiê: `app_user` = usuário; `unit` = unidade; `vehicle` = veículo; `charging_session` = sessão; `charge_point` = carregador; `tariff_period` = vigência de tarifa; `invoice` = fatura; `invoice_line` = item de fatura.
+
+2. **Credencial é entidade própria, separada do usuário.** A Opção A fatura por unidade agregando *credenciais* (cartão RFID ou conta de app), e a Frente 2 mostrou que a atribuição sessão → usuário é o coração do produto — o carregador autentica o cartão, a plataforma autentica a pessoa. Modelar a credencial como atributo do usuário (um `tag_rfid` em `app_user`) quebraria três casos reais: usuário com cartão **e** app, cartão perdido e substituído (a credencial antiga precisa continuar resolvendo as sessões históricas) e o visitante com credencial avulsa. A sessão grava o `auth_id` bruto recebido do carregador **e** a FK para a credencial resolvida — redundância deliberada: se o cadastro for corrigido depois, a trilha de auditoria preserva o que o equipamento de fato reportou.
+
+3. **Fatura por unidade, não por usuário nem por veículo.** É a decisão da Opção A (caso 3) virando chave estrangeira: `invoice.unit_id`. O casal com dois carros gera sessões por duas credenciais distintas, mas `S_u` agrega tudo na mesma fatura — o extrato discrimina por linha qual credencial iniciou cada sessão. Veículo existe no esquema (`vehicle`) como cadastro para UX e features de IA (capacidade da bateria contextualiza anomalia de consumo), mas **nenhuma FK de faturamento passa por ele**. Exceção única: sessão de visitante gera fatura avulsa com `unit_id` nulo e `visitor_user_id` preenchido (restrição: exatamente um dos dois), fora do rateio — como o art. 554 da REN 1.000 permite e a Opção A registrou.
+
+4. **Tarifa versionada por vigência + snapshot na sessão.** Tarifa muda (a homologada Enel SP vigora até 03/07/2026; `C_disp` é revisável em assembleia). Guardar um valor único "atual" faria um reajuste reescrever o passado. Por isso `tariff_period` tem `valid_from`/`valid_to` (vigências sem sobreposição por condomínio) e a sessão grava, no encerramento, **o valor aplicado** (`applied_tariff_kwh`) além da FK — o snapshot da Opção A, imune até a uma correção retroativa da própria vigência.
+
+5. **Reconciliação de tarifa: provisória na sessão, ajuste no fechamento.** A tensão a resolver: a Opção A define `tarifa_s` como snapshot no encerramento da sessão, mas a posição preliminar de tributos manda usar o R$/kWh **efetivo da fatura do condomínio** — que só existe quando a fatura da distribuidora chega, semanas depois. *Decisão da equipe:* as duas coisas, em dois tempos. A sessão grava uma **tarifa provisória** (a melhor estimativa vigente: o efetivo apurado do último mês conhecido; no primeiro ciclo, sem histórico, a homologada ANEEL como bootstrap declarado). A fatura da competência `M` fecha no dia previsto com a provisória. Quando a fatura da distribuidora de `M` chega, o sistema apura o efetivo (`total ÷ kWh faturados`, 4 casas), registra em `tariff_reconciliation` e a fatura de `M+1` carrega **uma linha de ajuste por unidade**: `round2(kwh_total_u_em_M × (efetiva − provisória))` — positiva ou negativa. Uma linha por unidade (e não o recálculo sessão a sessão) mantém a fatura legível e limita o erro de arredondamento a 1 centavo por unidade. O desenho preserva a posição da Opção A (o condômino paga, no acumulado, exatamente o custo efetivo — repasse sem margem) sem sacrificar a previsibilidade do fechamento em dia fixo; e como a provisória converge para o efetivo recente, os ajustes tendem a centavos em regime permanente. A pendência de validação com administradora e contador (Opção A) segue de pé — ela valida o *valor* da tarifa, não este *mecanismo*.
+
+6. **Sessão guarda status e motivo de encerramento.** O caso 1 da Opção A (sessão interrompida) cobra o medido até a interrupção e registra o motivo na linha da fatura — logo a sessão precisa de `status` (`completed` | `interrupted` | `fault` | `in_progress`) e `stop_reason` (o motivo do StopTransaction, Frente 1). O degenerado (telemetria perde a leitura final) aparece como `meter_stop` nulo + `energy_kwh` pela última leitura periódica + flag de auditoria — exatamente o mecanismo que a Opção B reaproveita para anomalias.
+
+7. **Telemetria em tabela própria, fora da sessão.** A Opção B consome `power_kw` como **série temporal** e a saúde do ponto exige heartbeats e estado mesmo sem sessão ativa (caso Copel). `telemetry_reading` registra cada amostra (MeterValues, heartbeat, mudança de estado) com FK obrigatória ao ponto e FK **opcional** à sessão — a leitura fora de sessão é justamente o sinal de carregador offline ou cabo conectado sem corrente.
+
+8. **Adesão ao programa é entidade com datas, não um booleano.** `N_aderentes` muda mês a mês e a Opção A prevê pro rata por dias de adesão. Um booleano em `unit` não tem memória; `program_enrollment` com `start_date`/`end_date` reconstrói o `N_aderentes` de qualquer competência passada e dá a base do pro rata. A `ideal_fraction` da unidade fica no cadastro como dado condominial padrão, mas **não participa do rateio** — decisão da Opção A (rateio igual entre aderentes), registrada aqui para que a coluna não sugira o contrário.
+
+### Diagrama entidade–relacionamento
+
+```mermaid
+erDiagram
+    CONDOMINIUM ||--o{ UNIT : "possui"
+    CONDOMINIUM ||--o{ CHARGE_POINT : "instala"
+    CONDOMINIUM ||--o{ TARIFF_PERIOD : "parametriza"
+    CONDOMINIUM ||--o{ TARIFF_RECONCILIATION : "apura"
+    UNIT ||--o{ PROGRAM_ENROLLMENT : "adere via"
+    UNIT |o--o{ APP_USER : "abriga"
+    UNIT |o--o{ INVOICE : "recebe"
+    APP_USER ||--o{ CREDENTIAL : "autentica com"
+    APP_USER ||--o{ VEHICLE : "cadastra"
+    APP_USER |o--o{ INVOICE : "paga avulso (visitante)"
+    CREDENTIAL ||--o{ CHARGING_SESSION : "inicia"
+    CHARGE_POINT ||--o{ CHARGING_SESSION : "executa"
+    CHARGE_POINT ||--o{ TELEMETRY_READING : "emite"
+    CHARGING_SESSION |o--o{ TELEMETRY_READING : "detalha"
+    TARIFF_PERIOD |o--o{ CHARGING_SESSION : "precifica"
+    INVOICE ||--|{ INVOICE_LINE : "compõe-se de"
+    CHARGING_SESSION |o--o{ INVOICE_LINE : "origina"
+    TARIFF_RECONCILIATION |o--o{ INVOICE_LINE : "ajusta"
+    CHARGING_SESSION |o--o{ ANOMALY_FLAG : "sinaliza"
+    CHARGE_POINT |o--o{ ANOMALY_FLAG : "monitora"
+```
+
+Leitura das cardinalidades não óbvias: `UNIT |o--o{ APP_USER` porque o visitante é usuário sem unidade; `INVOICE` pertence a uma unidade **ou** a um visitante (FKs mutuamente exclusivas); `TELEMETRY_READING` sempre pertence a um ponto, opcionalmente a uma sessão; `ANOMALY_FLAG` referencia sessão (anomalias de consumo/medição) ou ponto (anomalias de saúde), ao menos um dos dois.
+
+### Dicionário de entidades
+
+Convenções: PK = `id` inteiro autoincremental em toda entidade (omitido das tabelas); timestamps com fuso (`TIMESTAMPTZ`, armazenados em UTC); valores monetários `DECIMAL(10,2)`; energia `DECIMAL(9,3)` (3 casas, como `kwh_s` na Opção A); tarifas `DECIMAL(8,4)` (4 casas); enums implementados como `TEXT` + `CHECK`.
+
+**`condominium`** — o condomínio (a plataforma nasce multi-condomínio; o parâmetro de potência declarada alimenta o alerta de limite da Opção B):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `name` | TEXT | Nome do condomínio |
+| `utility_name` | TEXT | Distribuidora (ex.: Enel SP) — ancora a tarifa de referência |
+| `declared_power_kw` | DECIMAL(7,2) | Potência declarada da instalação de recarga (Lei 18.403 / IT-41) — teto do alerta de potência da abordagem 1 |
+| `visitor_price_kwh` | DECIMAL(8,4) | Tarifa própria de visitante definida pelo condomínio (nula = visitante desabilitado) |
+
+**`unit`** — a unidade condominial (apartamento/casa), o sujeito da fatura:
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `condominium_id` | FK → condominium | — |
+| `label` | TEXT | Identificador da unidade (ex.: "72"); único por condomínio |
+| `block` | TEXT | Bloco/torre (nulo se não houver) |
+| `ideal_fraction` | DECIMAL(8,6) | Fração ideal — cadastral; **não usada no rateio** (decisão 8) |
+
+**`program_enrollment`** — adesão da unidade ao programa de recarga (base do `N_aderentes` e do pro rata):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `unit_id` | FK → unit | — |
+| `start_date` / `end_date` | DATE | Vigência da adesão; `end_date` nula = ativa. Sem sobreposição por unidade |
+
+**`app_user`** — a pessoa (morador, síndico/gestor ou visitante):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `name` / `email` | TEXT | Cadastro básico; e-mail único |
+| `unit_id` | FK → unit, **nula** | Nula para visitante (decisão 3) e para gestor sem unidade |
+| `role` | TEXT CHECK | `resident` \| `manager` \| `visitor` |
+| `created_at` | TIMESTAMPTZ | — |
+
+**`credential`** — a credencial que inicia sessões (decisão 2):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `user_id` | FK → app_user | — |
+| `kind` | TEXT CHECK | `rfid` \| `app` |
+| `auth_tag` | TEXT, único | UID do cartão RFID ou identificador da conta no app — é o que o carregador reporta como `auth_id` |
+| `status` | TEXT CHECK | `active` \| `suspended` \| `revoked` — suspensão é decisão de assembleia (Opção A), o campo só a registra |
+| `valid_from` | DATE | — |
+
+**`vehicle`** — cadastro do veículo (UX e contexto de IA; sem papel no faturamento — decisão 3):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `user_id` | FK → app_user | — |
+| `plate` | TEXT, único | Placa |
+| `model` | TEXT | Modelo |
+| `battery_capacity_kwh` | DECIMAL(6,2) | Capacidade da bateria — contextualiza anomalias de consumo (sessão maior que a bateria é fisicamente impossível) |
+
+**`charge_point`** — o carregador físico:
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `condominium_id` | FK → condominium | — |
+| `serial_number` | TEXT, único | Número de série — é o `charge_point_id` do contrato da Frente 2 (o `sn` do SEMS) |
+| `model` | TEXT | Ex.: GoodWe HCA G2 7 kW |
+| `location` | TEXT | Vaga/posição na garagem |
+| `rated_power_kw` | DECIMAL(6,2) | Potência nominal — denominador da razão kWh/hora da abordagem 3 |
+| `commissioned_at` | DATE | Entrada em operação |
+
+**`charging_session`** — a sessão de recarga, entidade central (espelha o contrato da Frente 2 e o ciclo OCPP da Frente 1):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `charge_point_id` | FK → charge_point | — |
+| `credential_id` | FK → credential | Credencial resolvida no cadastro |
+| `auth_id` | TEXT | Identificador **bruto** reportado pelo carregador (redundância de auditoria — decisão 2) |
+| `auth_method` | TEXT CHECK | `rfid` \| `app` |
+| `session_start` / `session_end` | TIMESTAMPTZ | Início (StartTransaction) e fim (StopTransaction); `session_end` nula enquanto ativa. **Regra de competência:** a sessão pertence ao mês civil de `session_start` (caso "virada de mês" da Opção A) |
+| `meter_start` / `meter_stop` | DECIMAL(12,3) | Leituras do medidor acumulado; `meter_stop` nula = leitura final perdida (caso degenerado da Opção A) |
+| `energy_kwh` | DECIMAL(9,3) | Energia da sessão (`meter_stop − meter_start`; com leitura perdida, última leitura periódica conhecida) — é o `kwh_s` da fórmula |
+| `max_power_kw` | DECIMAL(6,2) | Potência máxima observada na sessão |
+| `status` | TEXT CHECK | `in_progress` \| `completed` \| `interrupted` \| `fault` (decisão 6) |
+| `stop_reason` | TEXT | Motivo do encerramento (vocabulário OCPP: `Local`, `EVDisconnected`, `PowerLoss`, `EmergencyStop`...) |
+| `measurement_source` | TEXT CHECK | `cloud` \| `modbus_local` \| `mid_meter` — campo exigido pela Frente 2 (medição certificada vale mais que número de API) |
+| `applied_tariff_id` | FK → tariff_period, nula | Vigência aplicada; nula enquanto `in_progress`, preenchida no encerramento |
+| `applied_tariff_kwh` | DECIMAL(8,4) | **Snapshot** do valor provisório aplicado — é a `tarifa_s` da fórmula (decisões 4 e 5) |
+
+**`telemetry_reading`** — série temporal de telemetria (decisão 7):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `charge_point_id` | FK → charge_point | Obrigatória |
+| `session_id` | FK → charging_session, nula | Nula fora de sessão (heartbeat, cabo sem corrente) |
+| `ts` | TIMESTAMPTZ | Instante da amostra; índice composto (`charge_point_id`, `ts`) |
+| `kind` | TEXT CHECK | `meter_value` \| `heartbeat` \| `status_change` |
+| `state` | TEXT CHECK | `disconnected` \| `connected` \| `charging` \| `finished` \| `offline` — o `state` do contrato da Frente 2 |
+| `power_kw` | DECIMAL(6,2) | Potência instantânea — o `power_kw` (série) que a abordagem 1 agrega |
+| `energy_kwh_total` | DECIMAL(12,3) | Leitura acumulada do medidor |
+| `measurement_source` | TEXT CHECK | Mesmo enum da sessão |
+
+**`tariff_period`** — parâmetros econômicos versionados por vigência (decisão 4):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `condominium_id` | FK → condominium | — |
+| `price_kwh` | DECIMAL(8,4) | Tarifa **provisória** de repasse por kWh (decisão 5) |
+| `availability_fee_month` | DECIMAL(10,2) | `C_disp` — taxa de disponibilidade mensal total |
+| `basis` | TEXT | Origem declarada do valor (ex.: "homologada ANEEL Enel SP B3 — bootstrap" ou "efetiva da fatura abr/2026") |
+| `assembly_ref` | TEXT | Referência da ata de assembleia que aprovou |
+| `valid_from` / `valid_to` | DATE | Vigência; sem sobreposição por condomínio; `valid_to` nula = vigente |
+
+**`tariff_reconciliation`** — apuração do efetivo e fechamento da reconciliação (decisão 5):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `condominium_id` | FK → condominium | — |
+| `competence` | CHAR(7) | Competência apurada (`YYYY-MM`); única por condomínio |
+| `utility_invoice_total` | DECIMAL(12,2) | Total da fatura da distribuidora da competência |
+| `utility_invoice_kwh` | DECIMAL(12,3) | kWh faturados |
+| `effective_price_kwh` | DECIMAL(8,4) | Efetivo = total ÷ kWh, 4 casas |
+| `provisional_price_kwh` | DECIMAL(8,4) | Provisória que vigorou na competência |
+| `delta_price_kwh` | DECIMAL(8,4) | Efetiva − provisória (pode ser negativa) |
+| `settled_in_competence` | CHAR(7) | Competência cuja fatura carrega as linhas de ajuste |
+
+**`invoice`** — a fatura mensal (decisão 3):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `condominium_id` | FK → condominium | — |
+| `unit_id` | FK → unit, nula | Fatura da unidade; única por (`unit_id`, `competence`) |
+| `visitor_user_id` | FK → app_user, nula | Fatura avulsa de visitante; CHECK: exatamente uma das duas FKs preenchida |
+| `competence` | CHAR(7) | `YYYY-MM` |
+| `status` | TEXT CHECK | `draft` \| `under_review` \| `closed` \| `paid` \| `overdue` — `under_review` é o estado com linhas em auditoria (Opção B); `overdue` registra inadimplência sem automatizar punição (Opção A) |
+| `total_amount` | DECIMAL(10,2) | Soma das linhas, persistida no fechamento para auditoria |
+| `issued_at` / `due_date` | TIMESTAMPTZ / DATE | Emissão e vencimento |
+
+**`invoice_line`** — a linha da fatura (a unidade do `round2` por linha da Opção A):
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `invoice_id` | FK → invoice | — |
+| `kind` | TEXT CHECK | `session` \| `availability_fee` \| `tariff_adjustment` |
+| `session_id` | FK → charging_session, nula | Obrigatória se `kind = session` |
+| `reconciliation_id` | FK → tariff_reconciliation, nula | Obrigatória se `kind = tariff_adjustment` |
+| `description` | TEXT | Texto legível do extrato (data, credencial, motivo de interrupção...) |
+| `energy_kwh` | DECIMAL(9,3) | kWh da linha (nulo na taxa de disponibilidade) |
+| `unit_price_kwh` | DECIMAL(8,4) | Tarifa aplicada na linha |
+| `amount` | DECIMAL(10,2) | Valor `round2` half-up |
+| `flagged_for_audit` | BOOLEAN | Linha marcada para auditoria (anomalia da Opção B ou telemetria perdida da Opção A) |
+
+**`anomaly_flag`** — saída da abordagem 3 da Opção B, com explicação legível:
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `session_id` | FK → charging_session, nula | CHECK: `session_id` ou `charge_point_id` preenchida |
+| `charge_point_id` | FK → charge_point, nula | Para anomalias de saúde do ponto (heartbeats perdidos, taxa de falhas) |
+| `category` | TEXT CHECK | `consumption` \| `idle` \| `power_degradation` \| `metering` \| `health` |
+| `explanation` | TEXT | Explicação legível (exigência da Opção B: "consumo 4× o padrão da credencial") |
+| `status` | TEXT CHECK | `open` \| `accepted` \| `contested` \| `dismissed` — humano decide (Opção B) |
+| `reviewed_by_user_id` | FK → app_user, nula | Quem revisou |
+| `created_at` / `reviewed_at` | TIMESTAMPTZ | — |
+
+### Rastreabilidade: cada contrato do dossiê → onde vive no esquema
+
+| Exigência (origem) | Onde vive no esquema |
+|---|---|
+| `S_u` — sessões do mês atribuídas à unidade (Opção A) | `charging_session.session_start` (mês civil) + cadeia `credential → app_user → unit` |
+| `kwh_s` (Opção A) | `charging_session.energy_kwh` (3 casas), derivada de `meter_start`/`meter_stop` |
+| `tarifa_s` snapshot (Opção A) | `charging_session.applied_tariff_kwh` + `applied_tariff_id`; reconciliação via `tariff_reconciliation` + linha `tariff_adjustment` |
+| `C_disp` (Opção A) | `tariff_period.availability_fee_month` |
+| `N_aderentes` e pro rata (Opção A) | Contagem de `program_enrollment` ativos na competência; pro rata pelas datas |
+| `round2` por linha (Opção A) | `invoice_line.amount` DECIMAL(10,2), uma linha por sessão + uma da taxa |
+| Sessão interrompida com motivo na fatura (Opção A, caso 1) | `charging_session.status` + `stop_reason` → `invoice_line.description`; leitura perdida → `meter_stop` nulo + `flagged_for_audit` |
+| Visitante fora do rateio (Opção A) | `app_user.role = visitor` + `invoice.visitor_user_id` + `condominium.visitor_price_kwh` |
+| Inadimplência sem automatismo (Opção A) | `invoice.status = overdue` + `credential.status` (mudança só por decisão de assembleia) |
+| `charge_point_id`, `session_start/end`, `energy_kwh`, `auth_id`, `measurement_source` (contrato Frente 2) | `charge_point.serial_number` e colunas homônimas de `charging_session` |
+| `power_kw` série temporal, `state` (contrato Frente 2 / Opção B) | `telemetry_reading.power_kw`, `.state`, `.ts` |
+| Curva 7d e alerta de potência (Opção B, abordagem 1) | Agregados de `charging_session` + `telemetry_reading`; teto em `condominium.declared_power_kw` |
+| Features de perfil por credencial (Opção B, abordagem 2) | Deriváveis de `charging_session` por `credential_id` (kWh médio, hora típica, frequência, duração) |
+| Flag com explicação → linha marcada para auditoria (Opção B, abordagem 3) | `anomaly_flag` (categoria, explicação, revisão humana) + `invoice_line.flagged_for_audit` |
+| Saúde do ponto: heartbeats, sessões falhas (Opção B / caso Copel) | `telemetry_reading.kind = heartbeat` (ausência = offline) + `charging_session.status = fault` por ponto |
+
+### Registros simulados — um exemplo por entidade
+
+Os registros abaixo são do mesmo cenário do mês fictício (FKs consistentes entre si e com as tabelas seguintes). A sessão escolhida é a interrompida — o exemplo mais rico: queda de energia, leitura final perdida, energia pela última telemetria, linha de fatura marcada para auditoria e flag aceita pelo síndico (usuário 2, gestor, omitido do bloco por brevidade).
+
+```json
+{
+  "condominium": {
+    "id": 1, "name": "Residencial Jardim Aurora",
+    "utility_name": "Enel Distribuição São Paulo",
+    "declared_power_kw": 7.00, "visitor_price_kwh": 1.2000
+  },
+  "unit": {
+    "id": 34, "condominium_id": 1, "label": "34", "block": "B",
+    "ideal_fraction": 0.020833
+  },
+  "program_enrollment": {
+    "id": 5, "unit_id": 34, "start_date": "2026-03-01", "end_date": null
+  },
+  "app_user": {
+    "id": 4, "name": "Carla Lima", "email": "carla.lima@example.com",
+    "unit_id": 34, "role": "resident", "created_at": "2026-03-01T10:12:00-03:00"
+  },
+  "credential": {
+    "id": 4, "user_id": 4, "kind": "rfid", "auth_tag": "04A2-3B7C-11",
+    "status": "active", "valid_from": "2026-03-01"
+  },
+  "vehicle": {
+    "id": 4, "user_id": 4, "plate": "EVC2B34", "model": "GWM Ora 03 Skin",
+    "battery_capacity_kwh": 48.00
+  },
+  "charge_point": {
+    "id": 1, "condominium_id": 1, "serial_number": "HCA7K-2026-00121",
+    "model": "GoodWe HCA G2 7 kW", "location": "Garagem G1, vaga V-101",
+    "rated_power_kw": 7.00, "commissioned_at": "2026-02-15"
+  },
+  "tariff_period": {
+    "id": 1, "condominium_id": 1, "price_kwh": 0.7252,
+    "availability_fee_month": 180.00,
+    "basis": "Tarifa homologada ANEEL — Enel SP, grupo B3 (bootstrap do 1º ciclo, sem fatura efetiva anterior)",
+    "assembly_ref": "Ata AGE 2026-05-20", "valid_from": "2026-06-01", "valid_to": null
+  },
+  "charging_session": {
+    "id": 1005, "charge_point_id": 1, "credential_id": 4,
+    "auth_id": "04A2-3B7C-11", "auth_method": "rfid",
+    "session_start": "2026-06-12T22:45:00-03:00",
+    "session_end": "2026-06-12T23:41:00-03:00",
+    "meter_start": 8412.300, "meter_stop": null, "energy_kwh": 6.020,
+    "max_power_kw": 6.90, "status": "interrupted", "stop_reason": "PowerLoss",
+    "measurement_source": "cloud",
+    "applied_tariff_id": 1, "applied_tariff_kwh": 0.7252
+  },
+  "telemetry_reading": {
+    "id": 88412, "charge_point_id": 1, "session_id": 1005,
+    "ts": "2026-06-12T23:38:00-03:00", "kind": "meter_value",
+    "state": "charging", "power_kw": 6.80, "energy_kwh_total": 8418.320,
+    "measurement_source": "cloud"
+  },
+  "anomaly_flag": {
+    "id": 3, "session_id": 1005, "charge_point_id": null,
+    "category": "metering",
+    "explanation": "Leitura final do medidor perdida (queda de energia). Energia da sessão apurada pela última leitura periódica (23:38): 6,020 kWh — valor medido mais conservador.",
+    "status": "accepted", "reviewed_by_user_id": 2,
+    "created_at": "2026-06-12T23:45:00-03:00", "reviewed_at": "2026-06-28T09:30:00-03:00"
+  },
+  "invoice": {
+    "id": 6, "condominium_id": 1, "unit_id": 34, "visitor_user_id": null,
+    "competence": "2026-06", "status": "closed", "total_amount": 66.76,
+    "issued_at": "2026-07-01T08:00:00-03:00", "due_date": "2026-07-10"
+  },
+  "invoice_line": {
+    "id": 18, "invoice_id": 6, "kind": "session", "session_id": 1005,
+    "reconciliation_id": null,
+    "description": "Recarga 12/06 22:45 — cartão 04A2-3B7C-11 (interrompida: queda de energia; energia pela última leitura)",
+    "energy_kwh": 6.020, "unit_price_kwh": 0.7252, "amount": 4.37,
+    "flagged_for_audit": true
+  },
+  "tariff_reconciliation": {
+    "id": 1, "condominium_id": 1, "competence": "2026-06",
+    "utility_invoice_total": 3094.00, "utility_invoice_kwh": 3400.000,
+    "effective_price_kwh": 0.9100, "provisional_price_kwh": 0.7252,
+    "delta_price_kwh": 0.1848, "settled_in_competence": "2026-07",
+    "created_at": "2026-07-10T14:00:00-03:00"
+  }
+}
+```
+
+### Um mês fictício: junho/2026 no Residencial Jardim Aurora
+
+Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vigência tarifária do JSON acima (provisória R$ 0,7252/kWh, `C_disp` = R$ 180,00 — os mesmos parâmetros da demonstração curta da Opção A, que cobriu uma unidade; aqui o mês inteiro, multi-unidade). Três unidades carregaram: a **72** (Ana e Bruno, casal com **dois veículos** e duas credenciais — caso 3 da Opção A), a **34** (Carla, com a **sessão interrompida** — caso 1) e a **105** (Davi, cuja última sessão **atravessa a virada do mês**). As 10 sessões de junho:
+
+| # (id) | Início → fim | Unidade / credencial | kWh | Status |
+|---|---|---|---|---|
+| 1 (1001) | 02/06 22:10 → 03/06 06:05 | 72 / Ana (RFID) | 18,400 | concluída |
+| 2 (1002) | 05/06 21:30 → 06/06 01:15 | 34 / Carla (RFID) | 22,150 | concluída |
+| 3 (1003) | 08/06 19:05 → 09/06 01:00 | 105 / Davi (app) | 40,000 | concluída |
+| 4 (1004) | 10/06 23:00 → 11/06 03:40 | 72 / Bruno (app) | 25,000 | concluída |
+| 5 (1005) | 12/06 22:45 → 12/06 23:41 | 34 / Carla (RFID) | 6,020 | **interrompida** (queda de energia; leitura final perdida → auditoria) |
+| 6 (1006) | 15/06 21:00 → 15/06 23:05 | 105 / Davi (app) | 11,250 | concluída |
+| 7 (1007) | 18/06 22:40 → 19/06 03:30 | 34 / Carla (RFID) | 30,500 | concluída |
+| 8 (1008) | 22/06 20:50 → 22/06 22:30 | 72 / Ana (RFID) | 9,300 | concluída |
+| 9 (1009) | 26/06 21:10 → 26/06 23:20 | 34 / Carla (RFID) | 12,700 | concluída |
+| 10 (1010) | 30/06 23:40 → 01/07 05:20 | 105 / Davi (app) | 27,800 | concluída — **competência junho** (mês do início) |
+
+**Fechamento de 01/07** — fórmula da Opção A com `tarifa_s` = 0,7252 (provisória), `C_disp / N_aderentes` = 180,00 / 12 = R$ 15,00 (divisão exata, sem resíduo neste mês). Aritmética conferida por script com `decimal` e `ROUND_HALF_UP`:
+
+| Unidade 72 (faturas por unidade: 2 veículos, 1 fatura) | Cálculo | Valor |
+|---|---|---|
+| Sessão 1001 — Ana | 18,400 × 0,7252 = 13,34368 | R$ 13,34 |
+| Sessão 1004 — Bruno | 25,000 × 0,7252 = 18,13000 | R$ 18,13 |
+| Sessão 1008 — Ana | 9,300 × 0,7252 = 6,74436 | R$ 6,74 |
+| Taxa de disponibilidade | 180,00 / 12 | R$ 15,00 |
+| **Total (= demonstração da Opção A)** | | **R$ 53,21** |
+
+| Unidade 34 | Cálculo | Valor |
+|---|---|---|
+| Sessão 1002 | 22,150 × 0,7252 = 16,06318 | R$ 16,06 |
+| Sessão 1005 — interrompida, em auditoria | 6,020 × 0,7252 = 4,36570 | R$ 4,37 |
+| Sessão 1007 | 30,500 × 0,7252 = 22,11860 | R$ 22,12 |
+| Sessão 1009 | 12,700 × 0,7252 = 9,21004 | R$ 9,21 |
+| Taxa de disponibilidade | 180,00 / 12 | R$ 15,00 |
+| **Total** | | **R$ 66,76** |
+
+| Unidade 105 | Cálculo | Valor |
+|---|---|---|
+| Sessão 1003 | 40,000 × 0,7252 = 29,00800 | R$ 29,01 |
+| Sessão 1006 | 11,250 × 0,7252 = 8,15850 | R$ 8,16 |
+| Sessão 1010 — virada de mês | 27,800 × 0,7252 = 20,16056 | R$ 20,16 |
+| Taxa de disponibilidade | 180,00 / 12 | R$ 15,00 |
+| **Total** | | **R$ 72,33** |
+
+A linha da sessão 1006 exercita o half-up de verdade: 8,1585 arredonda para **8,16** (meio-para-cima), não 8,15 — é o caso que um arredondamento bancário (half-even) calcularia diferente, e o motivo de a Opção A ter fixado a regra explicitamente. As outras **9 unidades aderentes** sem sessão pagam só R$ 15,00 cada (caso 2 da Opção A); as 36 não aderentes, nada. Receita do mês: R$ 147,30 de energia + R$ 180,00 de disponibilidade = **R$ 327,30** sobre 203,120 kWh entregues.
+
+**Reconciliação (decisão 5 em ação).** Em 10/07 chega a fatura Enel de junho: R$ 3.094,00 por 3.400 kWh → efetivo = **R$ 0,9100/kWh** (o salto sobre os 0,7252 é esperado: a provisória de bootstrap era a homologada **sem tributos**; daqui em diante a provisória passa a ser o efetivo conhecido e os ajustes encolhem para centavos). Δ = 0,9100 − 0,7252 = 0,1848. As faturas de **julho** carregam uma linha `tariff_adjustment` por unidade que consumiu em junho:
+
+| Unidade | Ajuste (kWh de junho × Δ) | Valor |
+|---|---|---|
+| 72 | 52,700 × 0,1848 = 9,73896 | R$ 9,74 |
+| 34 | 71,370 × 0,1848 = 13,18918 | R$ 13,19 |
+| 105 | 79,050 × 0,1848 = 14,60844 | R$ 14,61 |
+
+Total de ajustes: R$ 37,54 (contra R$ 37,5366 exatos — erro de arredondamento de menos de 1 centavo por unidade, absorvido pelo caixa conforme a regra de resíduo da Opção A). As 9 aderentes sem consumo em junho não recebem ajuste — Δ multiplica kWh, e o kWh delas é zero.
+
+### Análise da equipe
+
+O esquema tem 14 entidades onde o enunciado pedia 4 ("usuário, unidade, sessão e fatura") — e cada uma das 10 a mais nasceu de uma exigência já escrita no dossiê, não de zelo de modelagem: `credential` existe porque a Frente 2 provou que a atribuição sessão → usuário é o produto; `telemetry_reading` porque a Opção B consome série temporal e o caso Copel exige saúde do ponto fora de sessão; `tariff_period` e `tariff_reconciliation` porque a Opção A prometeu snapshot **e** repasse exato do efetivo, e só os dois mecanismos juntos cumprem as duas promessas; `program_enrollment` porque `N_aderentes` é uma função do tempo, não uma constante; `anomaly_flag` e `invoice_line.flagged_for_audit` porque a Opção B definiu que anomalia vira linha de fatura marcada, não relatório paralelo. A decisão de maior consequência para a Sprint 2 é a reconciliação em dois tempos (provisória + ajuste): ela transforma a tensão entre o snapshot por sessão e o custo efetivo mensal — que era uma contradição latente entre duas seções deste dossiê — em um fluxo operacional datado, com a propriedade que mais importa em assembleia: cada número da fatura é reproduzível a partir de linhas auditáveis, e o morador vê o ajuste como linha explicada, não como tarifa que mudou misteriosamente. O custo declarado desse desenho: a fatura de um mês só fica "quitada de verdade" depois do ajuste do mês seguinte, e o primeiro ciclo (bootstrap pela homologada sem tributos) gera um ajuste grande de uma vez — o mês fictício mostra os dois efeitos com números, de propósito, porque é melhor a equipe e o síndico verem isso num exemplo simulado do que descobrirem na primeira fatura real. O que o esquema deliberadamente **não** modela nesta sprint, com o porquê: pagamento e conciliação bancária (o benchmark da Opção A mostrou que o repasse usa o trilho do boleto condominial existente — integração da administradora, não nossa); reserva de horário e fila (decisão operacional da Opção B que consome o esquema, mas não o altera); e multi-tenancy de operadora sobre vários condomínios (a FK `condominium_id` já deixa a porta aberta sem custo agora). A aposta verificável: se a Sprint 2 conseguir implementar o motor de rateio e o gerador sintético **somente** com o que está nestas tabelas — sem migração de emergência —, o contrato terá cumprido seu papel; a tabela de rastreabilidade acima é o checklist contra o qual essa aposta será cobrada.
 
 ## Fontes
 

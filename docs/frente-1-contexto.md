@@ -144,7 +144,7 @@ Entre ago/2025 e fev/2026 — o período de expansão mais rápida da história 
 
 ### Projeção ilustrativa: a pressão só aumenta
 
-Uma extrapolação geométrica simples — claramente ilustrativa, não previsão — dimensiona o que vem: mantido apenas o ritmo de 2025 (+26% a.a., o mais lento da série), entram ~283 mil eletrificados novos em 2026 e ~451 mil/ano em 2028; no ritmo do triênio 2022–2025 (+66% a.a.), seriam ~371 mil em 2026 e mais de 1 milhão/ano em 2028. A trajetória real depende de câmbio, tarifas de importação e política industrial, mas a ordem de grandeza é inequívoca em qualquer cenário.
+Uma extrapolação geométrica simples — claramente ilustrativa, não previsão — dimensiona o que vem: mantido apenas o ritmo de 2025 (+26% a.a., o mais lento da série), entram ~283 mil eletrificados novos em 2026 e ~451 mil/ano em 2028; no ritmo do triênio 2022–2025 (+66% a.a.), seriam ~371 mil em 2026 e mais de 1 milhão/ano em 2028. Usamos dois cenários justamente para delimitar a banda de possibilidades em vez de apostar numa trajetória única: o caminho real depende de variáveis exógenas — câmbio, tarifas de importação, política industrial e a própria expansão da infraestrutura —, mas a ordem de grandeza é inequívoca em qualquer ponto da banda.
 
 ![Projeção ilustrativa de emplacamentos 2026-2028](../assets/frota-ev-projecao-ilustrativa.png)
 

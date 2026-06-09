@@ -190,10 +190,132 @@ Três perguntas de fronteira, com a leitura da equipe explicitamente separada do
 - Confirmado em fonte primária (sem divergência): a Lei 18.403/2026 é **estadual** (ALESP, 18/02/2026, com retificação em 20/02/2026), como a Frente 1 corretamente classificou; e as três NBRs citadas (5410, 17019, NBR IEC 61851-1) existem com esses números e títulos, confirmados verbatim nos itens 5.2.1–5.2.3 da IT-41.
 
 ## Opção C — APIs complementares
-<!-- a preencher -->
+
+> **Método.** Tudo o que esta seção afirma sobre as duas APIs principais foi **verificado por chamada real (curl)** em 2026-06-09 — as respostas brutas estão preservadas em `data/` (gitignored; arquivos e comandos de reprodução listados em [`data/README.md`](../data/README.md)). Todo JSON de exemplo é trecho de resposta real, com truncamento marcado; nenhum payload foi inventado. Duas exceções, sinalizadas no texto: a chamada **autenticada** ao Open Charge Map (a chave gratuita exige registro de conta — fica para o time) e a Google Places API (documental, exige billing). Esta seção não repete o que já está no dossiê: regulação ANEEL é assunto da Opção A; a API do fabricante (SEMS) é assunto do corpo obrigatório — aqui entram as APIs **externas ao ecossistema GoodWe** que enriquecem a plataforma.
+
+### Open Charge Map (OCM) — contexto de mercado da recarga pública
+
+A OCM mantém o maior registro aberto de pontos de recarga do mundo, acessível por API REST. O endpoint principal é `GET https://api.openchargemap.io/v3/poi`, e a primeira constatação é prática: **a API exige chave** (gratuita). A chamada real sem chave, feita com as coordenadas da região do campus FIAP Aclimação:
+
+```bash
+curl -i "https://api.openchargemap.io/v3/poi?countrycode=BR&latitude=-23.5708&longitude=-46.6322&distance=10&distanceunit=km&maxresults=3"
+```
+
+```text
+HTTP/2 403
+content-type: text/plain;charset=UTF-8
+
+You must specify an API key using the key query parameter or x-api-key header.
+```
+
+A própria especificação OpenAPI oficial da OCM diz como obter a chave: *"To obtain a free API key Sign In to https://openchargemap.org and choose 'my apps' from the `my profile` menu, then select `Register An Application`"* — registro de conta com login, ou seja, ação humana do time (deixada como pendência; é gratuita e leva minutos). O **contrato da API, porém, está integralmente documentado e verificado sem a chave**, por duas fontes oficiais do próprio projeto OCM: a especificação OpenAPI (`ocm-openapi-spec.yaml`, a mesma renderizada na página oficial de documentação) e o **espelho oficial de dados `ocm-export` no GitHub** — que a Frente 1-C já usou para baixar os 1.298 POIs do Brasil e que serve exatamente o mesmo modelo de dados da API.
+
+Parâmetros de consulta mais úteis para o nosso caso (da especificação oficial):
+
+| Parâmetro | O que faz | Uso no EV ChargeOps |
+|---|---|---|
+| `countrycode` | Filtra por país (ISO 2 letras) | `BR` |
+| `latitude`, `longitude`, `distance`, `distanceunit` | Busca por raio a partir de um ponto | Vizinhança do condomínio cadastrado |
+| `operatorid`, `connectiontypeid`, `usagetypeid`, `statustypeid` | Filtros exatos por rede operadora, tipo de conector, tipo de uso e status (IDs do endpoint `/referencedata`) | Ex.: só pontos operacionais (`statustypeid=50`), só Tipo 2 |
+| `maxresults` (default 100), `compact`, `verbose` | Volume e forma da resposta (`compact=true` devolve IDs em vez de objetos de referência aninhados) | Respostas enxutas para o job de contexto |
+| `modifiedsince` | Só registros modificados após a data | Sincronização incremental |
+| `opendata` | Só dados sob licença aberta | Higiene de licenciamento se formos exibir dados de terceiros |
+
+Exemplo real de resposta — POI completo obtido do espelho oficial (`data/BR/OCM-474661.json`), um eletroposto na Vila Monumento, a ~2 km do campus FIAP Aclimação (truncado: 3 das 5 entradas de `Connections` e campos secundários omitidos):
+
+```json
+{
+  "ID": 474661,
+  "UUID": "EB26BF0C-2B38-47C7-9BFF-B85AA47FC866",
+  "OperatorID": 3711,
+  "UsageTypeID": 4,
+  "AddressInfo": {
+    "Title": "Eco Luz - Vila Monumento",
+    "AddressLine1": "Avenida Dom Pedro I, 372",
+    "Town": "São Paulo",
+    "StateOrProvince": "São Paulo",
+    "Postcode": "01552000",
+    "Latitude": -23.568422293035272,
+    "Longitude": -46.611635973921466
+  },
+  "Connections": [
+    { "ConnectionTypeID": 33, "StatusTypeID": 50, "PowerKW": 120, "Quantity": 4 },
+    { "ConnectionTypeID": 1036, "StatusTypeID": 50, "PowerKW": 7, "Quantity": 4 }
+  ],
+  "NumberOfPoints": 11,
+  "StatusTypeID": 50,
+  "DateLastVerified": "2026-01-27T12:38:00Z"
+}
+```
+
+Os campos-chave do contrato: **`AddressInfo`** (endereço e coordenadas), **`Connections[]`** (cada tipo de conector com `PowerKW`, quantidade e status próprio) e **`StatusTypeID`/`StatusType`** (operacional ou não). Os IDs se resolvem pelo endpoint `/referencedata` (também espelhado; baixado e conferido): `ConnectionTypeID 33` = *CCS (Type 2)*, `1036` = *Type 2 (Tethered Connector)*, `StatusTypeID 50` = *Operational*, `UsageTypeID 4` = *Public - Membership Required*, `OperatorID 3711` = *Go Electric E-Mobility (BR)*. Nota de forma: o espelho serve o formato compacto (IDs); com `verbose=true` (default da API), os mesmos campos vêm como objetos aninhados (`StatusType.IsOperational`, `Connections[].ConnectionType.Title`...) — equivalência declarada pela própria especificação (parâmetro `compact`), não verificada por chamada autenticada.
+
+**Como alimenta o EV ChargeOps:** a OCM descreve a recarga **pública** ao redor de cada condomínio — exatamente o que a plataforma não mede sozinha. Dois usos diretos: (i) no **relatório de viabilidade/painel do gestor**, o contexto competitivo local — quantos pontos públicos num raio de 2 km, com que potências e operadores, e a distância ao ponto operacional mais próximo (argumento objetivo na assembleia que discute instalar recarga no prédio); (ii) **benchmark de vizinhança** para posicionar o preço do rateio frente à alternativa pública que o condômino tem na rua. A OCM não traz preços, mas traz quem opera — e as tarifas públicas dos operadores identificados são consultáveis caso a caso.
+
+### ANEEL Dados Abertos (CKAN) — a tarifa de referência do motor de rateio
+
+O portal `dadosabertos.aneel.gov.br` é um CKAN padrão: API REST aberta, **sem chave**, com busca de datasets (`package_search`), metadados (`package_show`) e consulta a registros com filtro (`datastore_search`). A Frente 1-C já havia constatado que **não existe dataset de estações de recarga** no portal (buscas "recarga"/"eletropostos" vazias); o que existe — e interessa diretamente ao produto — são as **tarifas homologadas das distribuidoras**. Descoberta por chamada real:
+
+```bash
+curl "https://dadosabertos.aneel.gov.br/api/3/action/package_search?q=tarifa&rows=20"
+```
+
+retorna 12 datasets; o relevante é `tarifas-distribuidoras-energia-eletrica` (*"Tarifas de aplicação das distribuidoras de energia elétrica"* — valores de TE, Tarifa de Energia, e TUSD, Tarifa de Uso do Sistema de Distribuição, resultantes dos processos tarifários). O `package_show` do dataset aponta o recurso CSV com datastore ativo (`resource_id fcf2906c-7c32-4b9b-a637-054e7a5234f4`, **318.339 registros**, série histórica de todas as distribuidoras do país; arquivo gerado em 2026-06-09 — o dataset estava atualizado no próprio dia da consulta) e um dicionário de dados em PDF.
+
+A consulta de demonstração — tarifa vigente da distribuidora do caso de referência (Enel Distribuição São Paulo), grupo B3 convencional:
+
+```bash
+curl -G "https://dadosabertos.aneel.gov.br/api/3/action/datastore_search" \
+  --data-urlencode 'resource_id=fcf2906c-7c32-4b9b-a637-054e7a5234f4' \
+  --data-urlencode 'filters={"SigAgente":"ELETROPAULO","DscSubGrupo":"B3","DscBaseTarifaria":"Tarifa de Aplicação","DscModalidadeTarifaria":"Convencional"}' \
+  --data-urlencode 'sort=DatInicioVigencia desc' --data-urlencode 'limit=6'
+```
+
+Registro vigente retornado (real, truncado: campos `"Não se aplica"` e metadados omitidos):
+
+```json
+{
+  "_id": 304442,
+  "DscREH": "RESOLUÇÃO HOMOLOGATÓRIA Nº 3.477, DE 1 DE JULHO DE 2025",
+  "SigAgente": "ELETROPAULO",
+  "NumCNPJDistribuidora": "61695227000193",
+  "DatInicioVigencia": "2026-01-01",
+  "DatFimVigencia": "2026-07-03",
+  "DscBaseTarifaria": "Tarifa de Aplicação",
+  "DscSubGrupo": "B3",
+  "DscModalidadeTarifaria": "Convencional",
+  "DscUnidadeTerciaria": "MWh",
+  "VlrTUSD": "432,44",
+  "VlrTE": "292,74"
+}
+```
+
+Lido: a tarifa de aplicação vigente da Enel SP para B3 convencional é **TUSD 432,44 + TE 292,74 = R$ 725,18/MWh ≈ R$ 0,7252/kWh, sem tributos**, homologada pela REH nº 3.477/2025, vigente até 03/07/2026. Quatro pegadinhas de engenharia que **só a chamada real revelou** — e que pouparão horas na Sprint 2:
+
+1. **O nome do agente não é "ENEL SP"** (filtro retorna 0): a Enel Distribuição São Paulo aparece como `SigAgente: "ELETROPAULO"` (razão social histórica; o CNPJ `61695227000193` confirma a empresa). A busca por nome fantasia falha silenciosamente — mapear distribuidora por **CNPJ**, não por sigla.
+2. **Valores são strings com vírgula decimal, em R$/MWh** (`DscUnidadeTerciaria: "MWh"`) — o parser converte vírgula→ponto e divide por 1.000 para chegar ao R$/kWh.
+3. **Filtrar `DscBaseTarifaria = "Tarifa de Aplicação"`** — o dataset também carrega a "Base Econômica" (valor regulatório intermediário, não o aplicado na fatura).
+4. **Descartar as linhas `DscDetalhe: "SCEE"`** (TE de R$ 36,98/MWh) — é o componente de compensação da geração distribuída, não a tarifa cheia; sem esse filtro o motor de rateio leria uma TE quase 8× menor (e uma tarifa total ~35% menor).
+
+**Como alimenta o EV ChargeOps:** é o insumo da **tarifa de referência auditável** do motor de rateio. Em vez de um R$/kWh digitado à mão pelo síndico, a plataforma ancora o cálculo na tarifa homologada vigente da distribuidora do condomínio — com a Resolução Homologatória citável linha a linha numa contestação em assembleia. O campo `DatFimVigencia` dá de graça o gatilho de atualização: um job consulta o datastore e sabe exatamente quando a tarifa atual expira. Duas ressalvas de escopo, marcadas como leitura da equipe: o enquadramento da área comum do condomínio no subgrupo B (B1/B3, convencional ou branca) **varia por unidade consumidora** — é parâmetro de cadastro por condomínio, não constante do sistema; e a tarifa homologada vem **sem tributos** (ICMS, PIS/COFINS), enquanto a fatura real os embute — o rateio precisa decidir (e exibir) se usa a tarifa homologada + tributos parametrizados ou o R$/kWh efetivo da fatura. Transparência metodológica é parte do produto.
+
+### Google Places API (New), campo `evChargeOptions` — terceira opção, documental
+
+Registrada por completude, **sem chamada de teste** (a Places API exige projeto Google Cloud com billing ativo): a Places API (New) expõe no recurso `Place` o campo `evChargeOptions` (tipo `EVChargeOptions`), com `connectorCount` e `connectorAggregation[]` — este último agregando conectores por tipo e potência com `type`, `maxChargeRateKw`, `count`, **`availableCount`**, `outOfServiceCount` e `availabilityLastUpdateTime` (conferido na referência oficial REST em 2026-06-09). O diferencial frente à OCM é a **disponibilidade quase em tempo real** (`availableCount`) — informação que nem OCM nem ANEEL oferecem. Para o MVP é dispensável (a OCM cobre o caso de contexto estático sem custo); vira candidata se o produto evoluir para recomendar alternativas públicas em tempo real quando o carregador do prédio estiver ocupado.
+
+### Síntese
+
+| API | Endpoint demonstrado | Autenticação | Campos-chave | Uso na plataforma |
+|---|---|---|---|---|
+| Open Charge Map | `GET /v3/poi` (api.openchargemap.io) — chamada real sem chave (403 documentado) + contrato via espelho oficial `ocm-export` | Chave gratuita (`X-API-Key`), registro de conta pendente com o time | `AddressInfo`, `Connections[].PowerKW`, `ConnectionTypeID`, `StatusType`, `OperatorID` | Contexto competitivo local no painel do gestor; benchmark de vizinhança para o preço do rateio |
+| ANEEL Dados Abertos | `GET /api/3/action/package_search` e `datastore_search` (dadosabertos.aneel.gov.br) — chamadas reais com filtro | Nenhuma | `SigAgente`, `NumCNPJDistribuidora`, `DscSubGrupo`, `VlrTUSD`, `VlrTE`, `DatFimVigencia`, `DscREH` | Tarifa de referência auditável do motor de rateio, com job de atualização guiado pela vigência |
+| Google Places (New) | `Place.evChargeOptions` — somente documentação oficial, não testada | API key + billing Google Cloud | `connectorAggregation[].availableCount`, `maxChargeRateKw` | (futuro) disponibilidade em tempo real da recarga pública vizinha |
+
+### Análise da equipe
+
+As duas APIs testadas se complementam sem se sobrepor: a OCM olha **para fora** do condomínio (o mercado público ao redor), a ANEEL olha **para dentro** (o custo real da energia que o rateio reparte). A da ANEEL é a mais valiosa para o produto — não por riqueza técnica (é um CKAN comum), mas porque resolve o problema de **legitimidade** do rateio: o art. 554 da REN 1.000 permite preços livremente negociados (Opção A), mas liberdade de preço não dispensa transparência de custo, e ancorar o R$/kWh numa Resolução Homologatória pública e citável transforma a discussão de assembleia de "confia no síndico" para "confere na fonte". A OCM, por sua vez, expôs um dado de mercado pelo negativo: os 1.298 POIs brasileiros do espelho são quase todos shoppings, concessionárias e eletropostos — **recarga condominial não aparece no mapa público**, o que confirma que o nicho do EV ChargeOps está num território que as plataformas de recarga pública não enxergam. Por fim, o método desta seção rendeu mais que a documentação: as quatro pegadinhas do datastore da ANEEL (agente "ELETROPAULO", vírgula decimal, base tarifária, linhas SCEE) não estão em nenhum manual — só apareceram porque a chamada foi feita de verdade, e cada uma delas seria um bug silencioso no motor de rateio. A pendência registrada: obter a chave gratuita da OCM (ação humana, minutos) e repetir a consulta autenticada para validar a forma `verbose` da resposta — risco baixo, porque o espelho oficial serve o mesmo dataset.
 
 ## Fontes
-<!-- a preencher (demais seções) -->
 
 ### Frente 2 — corpo obrigatório (HCA G2 e API SEMS)
 
@@ -233,3 +355,21 @@ Fontes secundárias (usadas apenas para descobrir a existência de normas/proces
 
 10. Aranda/FotoVolt — "Aneel abre consulta para regras de recarga de veículos elétricos" (como fonte de descoberta da Consulta Pública ANEEL nº 42/2025; as datas estão confirmadas na fonte oficial nº 4). https://www.arandanet.com.br/revista/fotovolt/noticia/12147-Aneel-abre-consulta-para-regras-de-recarga-de-veiculos-eletricos.html
 11. Agência SP — "Corpo de Bombeiros de SP divulga novas regras de segurança para recarga de carros elétricos no estado". https://www.agenciasp.sp.gov.br/corpo-de-bombeiros-de-sp-divulga-novas-regras-de-seguranca-para-recarga-de-carros-eletricos-no-estado/
+
+### Frente 2 — Opção C
+
+Chamadas reais (curl, 2026-06-09; respostas brutas preservadas em `data/`, comandos de reprodução em [`data/README.md`](../data/README.md)):
+
+1. Open Charge Map — API `GET /v3/poi`, chamada sem chave (HTTP 403 com mensagem literal de exigência de chave; resposta íntegra em `data/ocm_api_nokey_response.txt`). https://api.openchargemap.io/v3/poi
+2. ANEEL Dados Abertos (CKAN) — `package_search?q=tarifa`, `package_show?id=tarifas-distribuidoras-energia-eletrica` e duas `datastore_search` (amostra de campos + filtro ELETROPAULO/B3/Tarifa de Aplicação/Convencional) sobre o recurso `fcf2906c-7c32-4b9b-a637-054e7a5234f4`. https://dadosabertos.aneel.gov.br/api/3/action/package_search?q=tarifa
+
+Documentação e dados oficiais (acesso em 2026-06-09):
+
+3. Open Charge Map — especificação OpenAPI oficial da API v3 (`ocm-openapi-spec.yaml`, repositório oficial `openchargemap/ocm-docs`; é a mesma especificação renderizada na página oficial de documentação openchargemap.org/site/develop/api, que também instrui o registro gratuito de chave). https://raw.githubusercontent.com/openchargemap/ocm-docs/master/Model/schema/ocm-openapi-spec.yaml
+4. Open Charge Map — espelho oficial de dados `openchargemap/ocm-export` (POI de exemplo `data/BR/OCM-474661.json` e `data/referencedata.json`, usados para o contrato de resposta e a resolução de IDs). https://github.com/openchargemap/ocm-export
+5. ANEEL Dados Abertos — dataset *Tarifas de aplicação das distribuidoras de energia elétrica* (página do dataset, com dicionário de dados em PDF entre os recursos). https://dadosabertos.aneel.gov.br/dataset/tarifas-distribuidoras-energia-eletrica
+6. Google — Places API (New), referência REST do recurso `Place` (campo `evChargeOptions`, tipo `EVChargeOptions`; somente documental, nenhuma chamada feita). https://developers.google.com/maps/documentation/places/web-service/reference/rest/v1/places
+
+Documentação de terceiros (referência de contrato genérico do CKAN, não usada para afirmar conteúdo da ANEEL):
+
+7. CKAN — documentação oficial da Datastore API (`datastore_search`, parâmetros `filters`/`sort`/`limit`). https://docs.ckan.org/en/latest/maintaining/datastore.html

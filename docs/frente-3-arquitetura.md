@@ -238,6 +238,7 @@ erDiagram
     CONDOMINIUM ||--o{ CHARGE_POINT : "instala"
     CONDOMINIUM ||--o{ TARIFF_PERIOD : "parametriza"
     CONDOMINIUM ||--o{ TARIFF_RECONCILIATION : "apura"
+    CONDOMINIUM ||--o{ INVOICE : "fatura"
     UNIT ||--o{ PROGRAM_ENROLLMENT : "adere via"
     UNIT |o--o{ APP_USER : "abriga"
     UNIT |o--o{ INVOICE : "recebe"
@@ -254,9 +255,10 @@ erDiagram
     TARIFF_RECONCILIATION |o--o{ INVOICE_LINE : "ajusta"
     CHARGING_SESSION |o--o{ ANOMALY_FLAG : "sinaliza"
     CHARGE_POINT |o--o{ ANOMALY_FLAG : "monitora"
+    APP_USER |o--o{ ANOMALY_FLAG : "revisa"
 ```
 
-Leitura das cardinalidades não óbvias: `UNIT |o--o{ APP_USER` porque o visitante é usuário sem unidade; `INVOICE` pertence a uma unidade **ou** a um visitante (FKs mutuamente exclusivas); `TELEMETRY_READING` sempre pertence a um ponto, opcionalmente a uma sessão; `ANOMALY_FLAG` referencia sessão (anomalias de consumo/medição) ou ponto (anomalias de saúde), ao menos um dos dois. **Nota:** a PK `id` foi omitida de todas as entidades conforme a convenção declarada na seção "Dicionário de entidades".
+Leitura das cardinalidades não óbvias: `UNIT |o--o{ APP_USER` porque o visitante é usuário sem unidade; `INVOICE` pertence a uma unidade **ou** a um visitante (FKs mutuamente exclusivas); `TELEMETRY_READING` sempre pertence a um ponto, opcionalmente a uma sessão; `ANOMALY_FLAG` referencia sessão (anomalias de consumo/medição) ou ponto (anomalias de saúde), ao menos um dos dois — e, quando revisada, aponta o revisor (`reviewed_by_user_id`, nula enquanto a flag está aberta). **Nota:** a PK `id` foi omitida de todas as entidades conforme a convenção declarada na seção "Dicionário de entidades".
 
 ### Dicionário de entidades
 
@@ -528,7 +530,7 @@ Os registros abaixo são do mesmo cenário do mês fictício (FKs consistentes e
 
 ### Um mês fictício: junho/2026 no Residencial Jardim Aurora
 
-Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vigência tarifária do JSON acima (provisória R$ 0,7252/kWh, `C_disp` = R$ 180,00 — os mesmos parâmetros da demonstração curta da Opção A, que cobriu uma unidade; aqui o mês inteiro, multi-unidade). Três unidades carregaram: a **72** (Ana e Bruno, casal com **dois veículos** e duas credenciais — caso 3 da Opção A; 3 unidades e 4 usuários no total — Ana e Bruno dividem a 72), a **34** (Carla, com a **sessão interrompida** — caso 1) e a **105** (Davi, cuja última sessão **atravessa a virada do mês**). As 10 sessões de junho:
+Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vigência tarifária do JSON acima (provisória R$ 0,7252/kWh, `C_disp` = R$ 180,00 — os mesmos parâmetros da demonstração curta da Opção A, que cobriu uma unidade; aqui o mês inteiro, multi-unidade). Três unidades carregaram: a **72** (Ana e Bruno, casal com **dois veículos** e duas credenciais — caso 3 da Opção A; 3 unidades e 4 usuários consumidores — Ana e Bruno dividem a 72; um quinto usuário, gestor (id 2), revisa a fila de auditoria), a **34** (Carla, com a **sessão interrompida** — caso 1) e a **105** (Davi, cuja última sessão **atravessa a virada do mês**). As 10 sessões de junho:
 
 | # (id) | Início → fim | Unidade / credencial | kWh | Status |
 |---|---|---|---|---|

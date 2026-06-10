@@ -1,5 +1,12 @@
 data/*
 !data/README.md
+# Evidências pequenas das chamadas reais da Frente 2-C (versionadas; ver data/README.md)
+!data/aneel_datastore_enelsp_b3.json
+!data/aneel_datastore_sample.json
+!data/aneel_package_show_tarifas.json
+!data/ocm_api_nokey_response.txt
+!data/ocm_poi_474661_full.json
+!data/ocm_openapi_spec.yaml
 .ipynb_checkpoints/
 __pycache__/
 .venv/

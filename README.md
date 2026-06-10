@@ -15,11 +15,11 @@ Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um 
 
 ## O problema
 
-O Brasil emplacou 223.912 veículos eletrificados leves em 2025 — crescimento de 26% sobre 2024, dez vezes o ritmo do mercado total — e 81% deles são plug-in, ou seja, dependem de tomada. A rede pública de recarga também cresce (+42% em doze meses), mas cresce mais devagar que a frota: mesmo no melhor semestre da história da rede, a razão de veículos plug-in por ponto público **piorou** de 17,9 para 19,6 — quase o dobro da referência de 10:1 que a própria ABVE considera adequada. A consequência, que quantificamos com dados públicos no nosso notebook de análise, é que a recarga cotidiana recai sobre o lugar onde o carro dorme: a garagem do condomínio, da empresa, do campus.
+O Brasil emplacou 223.912 veículos eletrificados leves em 2025 — crescimento de 26% sobre 2024, dez vezes o ritmo do mercado total — e 81% deles são plug-in, ou seja, dependem de tomada. A rede pública de recarga também cresce (+42% em doze meses), mas cresce mais devagar que a frota: mesmo no melhor semestre da história da rede, a razão de veículos plug-in por ponto público **piorou** de 17,9 para 19,6 — quase o dobro da referência de 10:1 que a própria ABVE considera adequada. A consequência, que quantificamos com dados públicos no nosso notebook de análise, é que a recarga cotidiana recai sobre o lugar onde o carro dorme: a garagem do condomínio, da empresa, do campus — padrão que a IEA confirma globalmente: a recarga residencial permanece a forma mais popular de recarregar um EV (*Global EV Outlook 2025*, fonte 71; detalhe na Frente 1).
 
 Essa garagem, porém, chega a esse papel sem nenhuma camada de gestão. A energia é da área comum, mas o consumo é individual; sem atribuição de sessão a usuário, o custo da recarga de poucos é diluído na cota condominial de todos — fonte direta de conflito em assembleia. Somam-se a isso o limite físico de potência da instalação, a disputa pelo carregador compartilhado, as exigências de segurança e conformidade pelas quais o síndico responde legalmente, e um quadro normativo que acelera a adoção (a Lei paulista 18.403/2026 garante ao condômino o direito de instalar ponto de recarga) sem dizer como operá-la.
 
-Nossa leitura do problema, construída ao longo das três frentes: **o gargalo não é o hardware, é a gestão**. Cada sessão de recarga já gera os dados necessários — quem autenticou, quanta energia foi entregue, quando, em que ponto. O que falta é a plataforma que estrutura esses dados em sessões identificadas por usuário, calcula o consumo individual, aplica um rateio justo e auditável e devolve inteligência operacional ao gestor e clareza ao morador. É isso que o EV ChargeOps propõe.
+Nossa leitura do problema, construída ao longo das três frentes: **o gargalo não é o hardware, é a gestão**. Cada sessão de recarga já captura os dados necessários — quem autenticou, quanta energia foi entregue, quando, em que ponto. O que falta é a plataforma que estrutura esses dados em sessões identificadas por usuário, calcula o consumo individual, aplica um rateio justo e auditável e devolve inteligência operacional ao gestor e clareza ao morador. É isso que o EV ChargeOps propõe.
 
 ## Frente 1 — Contexto e Problema
 
@@ -122,9 +122,15 @@ Total estimado: 13–17 dias ativos. A ordem é deliberada: dados antes de tudo 
 
 **Pendências e radar** (itens que não bloqueiam o início): chave gratuita da Open Charge Map (registro de conta, minutos); validação do tratamento de tributos do rateio com administradora e contador; visita ao Energy Innovation Lab para verificar o modelo exato do HCA G2 instalado e, se viável, capturar dado real; conclusão e incorporação das entrevistas da Frente 1-B; acompanhamento da Consulta Pública ANEEL 42/2025 e do decreto regulamentador da Lei 18.403/2026.
 
+## Uso de inteligência artificial
+
+A equipe usou assistentes de IA (Claude) como ferramenta de pesquisa e redação ao longo de toda a Sprint 1, sob direção e revisão humana. Toda fonte citada neste README e nos dossiês foi efetivamente acessada e verificada — o método de cada seção (texto oficial baixado do site do órgão, chamada real de API com resposta preservada, leitura íntegra de datasheet e manual) está declarado nos blocos "Método" no início das seções dos dossiês, e nenhuma referência entrou nas listas sem acesso confirmado.
+
+As análises, escolhas e conclusões são da equipe: a seleção das opções de aprofundamento em cada frente, a decisão de transformar a indisponibilidade da API SEMS (Opção 2-B) em decisão arquitetural, o modelo híbrido de rateio, o adiamento do clustering por honestidade estatística e a rejeição da interface conversacional no núcleo da solução. Os artefatos de planejamento do processo (especificação de design e plano de execução da sprint) estão em [docs/superpowers/](docs/superpowers/), por transparência sobre como a colaboração entre equipe e IA funcionou na prática.
+
 ## Fontes
 
-Todas as fontes abaixo foram efetivamente consultadas pela equipe, com acesso verificado em **2026-06-09**. A lista consolida, sem perdas e sem duplicatas, as fontes dos três dossiês — cada dossiê mantém a sua lista própria com o contexto de uso de cada fonte. Textos normativos oficiais estão preservados em [docs/normas/](docs/normas/); respostas brutas de APIs, em [data/](data/README.md).
+Todas as fontes abaixo foram efetivamente consultadas pela equipe, com acesso verificado em **2026-06-09** (salvo data indicada na própria entrada). A lista consolida, sem perdas e sem duplicatas, as fontes dos três dossiês — cada dossiê mantém a sua lista própria com o contexto de uso de cada fonte. Textos normativos oficiais estão preservados em [docs/normas/](docs/normas/); as evidências brutas das chamadas de API estão versionadas em [data/](data/README.md) (os datasets grandes ficam fora do repositório e são regeneráveis via notebook ou pelos comandos do README de `data/`).
 
 ### Normas e textos legais (fonte primária)
 
@@ -210,3 +216,7 @@ Todas as fontes abaixo foram efetivamente consultadas pela equipe, com acesso ve
 68. AutoIndústria — "A nova geografia da recarga elétrica no Brasil". https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
 69. Aranda/FotoVolt — "Aneel abre consulta para regras de recarga de veículos elétricos". https://www.arandanet.com.br/revista/fotovolt/noticia/12147-Aneel-abre-consulta-para-regras-de-recarga-de-veiculos-eletricos.html
 70. Agência SP — "Corpo de Bombeiros de SP divulga novas regras de segurança para recarga de carros elétricos no estado". https://www.agenciasp.sp.gov.br/corpo-de-bombeiros-de-sp-divulga-novas-regras-de-seguranca-para-recarga-de-carros-eletricos-no-estado/
+
+### Organismos internacionais
+
+71. IEA — *Global EV Outlook 2025*, cap. 6 "Electric vehicle charging" — "Home charging remains the most popular way to charge for EV owners" (p. 98); mais de 85% dos donos de EV nos EUA têm acesso a recarga residencial (p. 115). Acesso em 2026-06-10. https://www.iea.org/reports/global-ev-outlook-2025/electric-vehicle-charging · PDF íntegro: https://iea.blob.core.windows.net/assets/7ea38b60-3033-42a6-9589-71134f4229f4/GlobalEVOutlook2025.pdf

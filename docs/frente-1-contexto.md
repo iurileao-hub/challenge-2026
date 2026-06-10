@@ -6,7 +6,7 @@
 
 ### Contexto: a frota eletrificada cresce mais rápido que a infraestrutura de gestão
 
-O Brasil fechou 2025 com 223.912 veículos eletrificados leves vendidos — recorde histórico e crescimento de 26% sobre 2024, dez vezes acima do mercado total (que cresceu 2,6%). Desses, 181.542 são plug-in (PHEV + BEV), ou seja, veículos que efetivamente dependem de tomada [ABVE, 2026]. Como a recarga cotidiana de um EV acontece majoritariamente onde o carro dorme, esse crescimento empurra o problema para dentro de condomínios residenciais, estacionamentos corporativos e campi — ambientes onde a energia é compartilhada, mas o consumo é individual.
+O Brasil fechou 2025 com 223.912 veículos eletrificados leves vendidos — recorde histórico e crescimento de 26% sobre 2024, dez vezes acima do mercado total (que cresceu 2,6%). Desses, 181.542 são plug-in (PHEV + BEV), ou seja, veículos que efetivamente dependem de tomada [ABVE, 2026]. Como a recarga cotidiana de um EV acontece majoritariamente onde o carro dorme — a IEA registra que a recarga residencial permanece a forma mais popular de recarga entre proprietários de EV, com mais de 85% dos donos de EV nos EUA tendo acesso a recarga em casa [IEA, 2025] —, esse crescimento empurra o problema para dentro de condomínios residenciais, estacionamentos corporativos e campi — ambientes onde a energia é compartilhada, mas o consumo é individual.
 
 ### Os desafios do gestor
 
@@ -163,7 +163,7 @@ Os números fecham o argumento que as seções qualitativas vinham construindo. 
 
 ### Frente 1 — corpo e Opção A
 
-Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09.
+Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09, salvo data indicada na própria entrada.
 
 **Contexto e desafios operacionais**
 
@@ -202,7 +202,7 @@ Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09.
 
 ### Opção C — análise de dados públicos
 
-Todas as fontes abaixo foram acessadas em 2026-06-09. Citações no texto: [ABVE, 2026] = fonte 24; [ABVE, 2026b] = fonte 26; [ABVE, 2022] = fonte 25.
+Todas as fontes abaixo foram acessadas em 2026-06-09, salvo data indicada na própria entrada. Citações no texto: [ABVE, 2026] = fonte 24; [ABVE, 2026b] = fonte 26; [ABVE, 2022] = fonte 25.
 
 24. ABVE — "Eletrificados crescem dez vezes mais do que o conjunto do mercado, e vendas chegam a 224 mil veículos em 2025" (emplacamentos 2025/2024/2016 e divisão BEV/PHEV/HEV; mesma fonte 1). https://abve.org.br/eletrificados-crescem-dez-vezes-mais-do-que-conjunto-do-mercado-em-2025-com-224-mil-veiculos-vendidos/
 25. ABVE — "Eletrificados batem todas as previsões em 2021" (emplacamentos 2019–2021 e divisão por tecnologia em 2021). https://abve.org.br/eletrificados-batem-todas-as-previsoes-em-2021/
@@ -213,3 +213,4 @@ Todas as fontes abaixo foram acessadas em 2026-06-09. Citações no texto: [ABVE
 30. AutoIndústria — "A nova geografia da recarga elétrica no Brasil" (SP com 4.777 pontos, 28,3%; SP+RJ+RS+DF com mais da metade da rede). https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
 31. Open Charge Map — espelho oficial `ocm-export` no GitHub (1.298 pontos de recarga no Brasil, georreferenciados; a API oficial exige chave gratuita, o espelho não). https://github.com/openchargemap/ocm-export
 32. IBGE — API de localidades, lista oficial dos 5.571 municípios com UF e região. https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado
+33. IEA — *Global EV Outlook 2025*, cap. 6 "Electric vehicle charging" — "Home charging remains the most popular way to charge for EV owners" (p. 98); pesquisas recentes indicam que mais de 85% dos donos de EV nos EUA têm acesso a recarga residencial (p. 115). Citação no texto: [IEA, 2025]. Acesso em 2026-06-10. https://www.iea.org/reports/global-ev-outlook-2025/electric-vehicle-charging · PDF íntegro: https://iea.blob.core.windows.net/assets/7ea38b60-3033-42a6-9589-71134f4229f4/GlobalEVOutlook2025.pdf

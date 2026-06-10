@@ -24,10 +24,10 @@ function criarFormulario() {
   form
     .setDescription(
       'Olá! Você está sendo convidado(a) a participar de uma pesquisa acadêmica conduzida ' +
-      'por estudantes de graduação da FIAP. Queremos entender como pessoas que moram em ' +
-      'condomínios — ou os administram — lidam com a recarga de veículos elétricos e com a ' +
-      'divisão de custos de energia em espaços compartilhados. Sua experiência ajuda mesmo ' +
-      'que você nunca tenha usado um carregador.\n\n' +
+      'por estudantes de graduação em Ciência da Computação da FIAP. Queremos entender ' +
+      'como pessoas que moram em condomínios — ou os administram — lidam com a recarga de ' +
+      'veículos elétricos e com a divisão de custos de energia em espaços compartilhados. ' +
+      'Sua experiência ajuda mesmo que você nunca tenha usado um carregador.\n\n' +
       'Antes de começar, o essencial:\n\n' +
       'PARTICIPAÇÃO VOLUNTÁRIA — responda apenas se quiser; você pode fechar esta página a ' +
       'qualquer momento, sem qualquer prejuízo.\n' +

@@ -36,10 +36,10 @@
 Texto de abertura:
 
 > Olá! Você está sendo convidado(a) a participar de uma pesquisa acadêmica conduzida por
-> estudantes de graduação da FIAP. Queremos entender como pessoas que moram em condomínios —
-> ou os administram — lidam com a recarga de veículos elétricos e com a divisão de custos de
-> energia em espaços compartilhados. Sua experiência ajuda mesmo que você nunca tenha usado
-> um carregador.
+> estudantes de graduação em Ciência da Computação da FIAP. Queremos entender como pessoas
+> que moram em condomínios — ou os administram — lidam com a recarga de veículos elétricos
+> e com a divisão de custos de energia em espaços compartilhados. Sua experiência ajuda
+> mesmo que você nunca tenha usado um carregador.
 >
 > Antes de começar, o essencial:
 >

@@ -37,7 +37,7 @@ Na análise de mercado (Opção A), mapeamos quatro soluções em quadrantes dif
 
 Dossiê completo: [docs/frente-2-regulatorio.md](docs/frente-2-regulatorio.md) · Textos oficiais preservados: [docs/normas/](docs/normas/)
 
-**Opções de aprofundamento escolhidas: A (mapeamento regulatório completo) e C (APIs complementares).** A Opção B (exploração da API SEMS) ficou inviabilizada pela restrição de acesso comunicada pela GoodWe; a API foi coberta no nível obrigatório por levantamento documental, e essa restrição virou decisão arquitetural (ver "Estratégia de dados").
+**Opções de aprofundamento escolhidas: A (mapeamento regulatório completo) e C (APIs complementares).** A GoodWe comunicou que não disponibilizará acesso à API SEMS; a Opção B (exploração da API) ficou inviabilizada e virou decisão arquitetural. A API foi coberta no nível obrigatório por levantamento documental (ver "Estratégia de dados").
 
 O achado que define a arquitetura: **o carregador GoodWe HCA G2 não documenta OCPP (o único protocolo declarado é Modbus TCP) e a API SEMS é fechada — e a documentação oficial dela sequer menciona carregadores.** Lemos na íntegra os três documentos oficiais do equipamento (dois datasheets e o manual G2 de 69 páginas) e os dois documentos públicos da API; o contrato real usado pela comunidade vem de engenharia reversa do app SEMS+, sem os dois dados de que o rateio mais precisa (sessões encerradas e identidade do cartão RFID). Conclusão de engenharia: ancorar a plataforma nessa API seria construir sobre areia; a resposta é uma camada de ingestão plugável que normaliza qualquer fonte para um modelo interno OCPP-compatível. Documentamos também o que cada interface do HCA G2 permite (RFID como chave de atribuição de sessão, LAN/Wi-Fi para telemetria, RS-485 para medidor MID certificado, Bluetooth para comissionamento) e o achado positivo: a medição certificada via RS-485 é a fonte de kWh com lastro metrológico que um rateio contestável em assembleia exige.
 
@@ -58,6 +58,8 @@ No benchmark de rateio (Opção A), comparamos quatro arranjos com praticantes r
 No papel da IA (Opção B), impusemos a nós mesmos um teste objetivo contra IA decorativa: cada abordagem declara que campos do esquema consome, que saída produz e que decisão concreta habilita. Três abordagens passaram (previsão de demanda, clustering de perfis, detecção de anomalias); duas vão para a Sprint 2; o clustering fica especificado mas adiado por honestidade estatística; e a interface conversacional (NLP) foi explicitamente rejeitada do núcleo. Detalhe em "Papel da IA" abaixo.
 
 No esquema de dados (Opção C), derivamos de trás para frente — das exigências da fórmula de rateio, dos casos excepcionais e das abordagens de IA — um esquema de **14 entidades** (o enunciado pedia 4; cada uma das 10 a mais nasceu de exigência já escrita no dossiê), com dicionário completo, diagrama entidade–relacionamento, registros simulados de cada entidade e um mês fictício inteiro fechado com aritmética decimal conferida por script: 10 sessões, 3 unidades (incluindo o casal com dois veículos, a sessão interrompida e a sessão que atravessa a virada do mês), faturas linha a linha e a reconciliação tarifária do mês seguinte demonstrada com números.
+
+Com as três frentes fechadas, o desenho consolidado da plataforma é o que segue.
 
 ## Arquitetura da solução
 

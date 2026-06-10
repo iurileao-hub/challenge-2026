@@ -6,12 +6,12 @@ Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um 
 
 ## Equipe
 
-<!-- PENDENTE: nome da equipe e RMs dos integrantes — preencher antes da submissão (21/06/2026) -->
-
 | Integrante | RM |
 |---|---|
-| (nome) | (RM) |
-| (nome) | (RM) |
+| Gabriel Carmona Bittencourt | RM569239 |
+| Iúri Leão de Almeida | RM570215 |
+| Márcio Francisco dos Santos Júnior | RM570758 |
+| Maria Sophia Domingues dos Santos | RM571209 |
 
 ## O problema
 

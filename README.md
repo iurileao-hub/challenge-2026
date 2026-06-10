@@ -6,6 +6,8 @@ Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um 
 
 ## Equipe
 
+**Equipe GoodNóis**
+
 | Integrante | RM |
 |---|---|
 | Gabriel Carmona Bittencourt | RM569239 |

@@ -10,3 +10,7 @@ data/*
 .ipynb_checkpoints/
 __pycache__/
 .venv/
+
+# Artefatos locais da equipe (decisão: fora do repo público de entrega)
+CLAUDE.md
+entrega-sprint1.txt

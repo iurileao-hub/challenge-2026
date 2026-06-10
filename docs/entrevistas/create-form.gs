@@ -23,18 +23,25 @@ function criarFormulario() {
 
   form
     .setDescription(
-      'Esta é uma pesquisa acadêmica conduzida por estudantes de graduação da FIAP sobre ' +
-      'recarga de veículos elétricos e divisão de custos de energia em espaços compartilhados ' +
-      '(condomínios, edifícios e estacionamentos).\n\n' +
-      'PARTICIPAÇÃO VOLUNTÁRIA — você pode desistir a qualquer momento, fechando esta página.\n' +
-      'ANONIMATO — o formulário não coleta nome, e-mail, endereço, nome de condomínio nem ' +
-      'qualquer dado que identifique você; não é necessário login.\n' +
-      'USO DOS DADOS — as respostas serão analisadas de forma agregada e usadas ' +
-      'exclusivamente neste trabalho acadêmico.\n' +
+      'Olá! Você está sendo convidado(a) a participar de uma pesquisa acadêmica conduzida ' +
+      'por estudantes de graduação da FIAP. Queremos entender como pessoas que moram em ' +
+      'condomínios — ou os administram — lidam com a recarga de veículos elétricos e com a ' +
+      'divisão de custos de energia em espaços compartilhados. Sua experiência ajuda mesmo ' +
+      'que você nunca tenha usado um carregador.\n\n' +
+      'Antes de começar, o essencial:\n\n' +
+      'PARTICIPAÇÃO VOLUNTÁRIA — responda apenas se quiser; você pode fechar esta página a ' +
+      'qualquer momento, sem qualquer prejuízo.\n' +
+      'ANONIMATO — não coletamos nome, e-mail, endereço, nome do condomínio nem qualquer ' +
+      'dado que identifique você; não é necessário login. Justamente por serem anônimas, ' +
+      'as respostas não poderão ser localizadas e excluídas depois do envio.\n' +
+      'USO E GUARDA DOS DADOS — as respostas serão analisadas de forma agregada, usadas ' +
+      'exclusivamente neste trabalho acadêmico e guardadas pela equipe apenas durante o ' +
+      'desenvolvimento dele.\n' +
       'TEMPO ESTIMADO — 5 a 8 minutos.\n' +
       'RISCOS E BENEFÍCIOS — não há riscos previsíveis nem compensação financeira; o ' +
-      'benefício é contribuir para o desenho de soluções mais justas de recarga compartilhada.\n\n' +
-      'Dúvidas sobre a pesquisa: [PREENCHER e-mail de contato da equipe antes de publicar]'
+      'benefício é contribuir para soluções mais justas e transparentes de recarga ' +
+      'compartilhada.\n\n' +
+      'Dúvidas, antes ou depois de responder: team5@bettercall.com'
     )
     .setCollectEmail(false)
     .setLimitOneResponsePerUser(false)
@@ -58,8 +65,8 @@ function criarFormulario() {
   const consent = form.addMultipleChoiceItem();
   consent
     .setTitle(
-      'Declaro que li as informações acima, entendi o objetivo da pesquisa e concordo em ' +
-      'participar voluntariamente.'
+      'Declaro que tenho 18 anos ou mais, li as informações acima, entendi o objetivo da ' +
+      'pesquisa e concordo em participar voluntariamente.'
     )
     .setRequired(true)
     .setChoices([

@@ -35,23 +35,31 @@
 
 Texto de abertura:
 
-> Esta é uma pesquisa acadêmica conduzida por estudantes de graduação da FIAP sobre recarga
-> de veículos elétricos e divisão de custos de energia em espaços compartilhados
-> (condomínios, edifícios e estacionamentos).
+> Olá! Você está sendo convidado(a) a participar de uma pesquisa acadêmica conduzida por
+> estudantes de graduação da FIAP. Queremos entender como pessoas que moram em condomínios —
+> ou os administram — lidam com a recarga de veículos elétricos e com a divisão de custos de
+> energia em espaços compartilhados. Sua experiência ajuda mesmo que você nunca tenha usado
+> um carregador.
 >
-> **Participação voluntária** — você pode desistir a qualquer momento, fechando esta página.
-> **Anonimato** — o formulário não coleta nome, e-mail, endereço, nome de condomínio nem
-> qualquer dado que identifique você; não é necessário login.
-> **Uso dos dados** — as respostas serão analisadas de forma agregada e usadas
-> exclusivamente neste trabalho acadêmico.
+> Antes de começar, o essencial:
+>
+> **Participação voluntária** — responda apenas se quiser; você pode fechar esta página a
+> qualquer momento, sem qualquer prejuízo.
+> **Anonimato** — não coletamos nome, e-mail, endereço, nome do condomínio nem qualquer
+> dado que identifique você; não é necessário login. Justamente por serem anônimas, as
+> respostas não poderão ser localizadas e excluídas depois do envio.
+> **Uso e guarda dos dados** — as respostas serão analisadas de forma agregada, usadas
+> exclusivamente neste trabalho acadêmico e guardadas pela equipe apenas durante o
+> desenvolvimento dele.
 > **Tempo estimado** — 5 a 8 minutos.
 > **Riscos e benefícios** — não há riscos previsíveis nem compensação financeira; o
-> benefício é contribuir para o desenho de soluções mais justas de recarga compartilhada.
+> benefício é contribuir para soluções mais justas e transparentes de recarga compartilhada.
 >
-> Dúvidas sobre a pesquisa: **[e-mail de contato da equipe — preencher antes de publicar]**
+> Dúvidas, antes ou depois de responder: **team5@bettercall.com**
 
-- **F0** *(obrigatória, escolha única)* — "Declaro que li as informações acima, entendi o
-  objetivo da pesquisa e concordo em participar voluntariamente."
+- **F0** *(obrigatória, escolha única)* — "Declaro que tenho 18 anos ou mais, li as
+  informações acima, entendi o objetivo da pesquisa e concordo em participar
+  voluntariamente."
   - Concordo em participar → continua
   - Não concordo → **envia o formulário** (nada respondido)
 
@@ -184,7 +192,7 @@ serão usadas apenas neste trabalho acadêmico."
 - [ ] Configurações → Respostas → **"Coletar endereços de e-mail": Desativado** (o script já configura; conferir)
 - [ ] **"Limitar a 1 resposta": Desativado** (exigiria login — quebraria o anonimato)
 - [ ] "Permitir edição das respostas": Desativado
-- [ ] Preencher o **e-mail de contato da equipe** no texto do TCLE
+- [x] E-mail de contato da equipe no TCLE: **team5@bettercall.com** (já no script)
 - [ ] Tema sóbrio (sem imagem de marca de fabricante)
 - [ ] Testar a ramificação: consentimento negado → envia; perfil gestor → pula bloco morador; morador → pula bloco gestor
 - [ ] Vincular a uma planilha (Respostas → ícone Sheets) para análise

@@ -1,10 +1,63 @@
 # Frente 3 — Arquitetura e IA
 
 ## Camadas da plataforma
-<!-- a preencher -->
+
+> **Método.** Esta seção e a seguinte são o corpo obrigatório da Frente 3: organizam, nas quatro camadas pedidas pelo enunciado (física, conectividade, aplicação e apresentação), o que as demais seções deste dossiê e as Frentes 1 e 2 já estabeleceram. Nenhum componente é novo — cada caixa remete a uma decisão já documentada, com a remissão indicada. O diagrama de arquitetura está em [`../assets/arquitetura.png`](../assets/arquitetura.png) (fonte editável: [`../assets/arquitetura.mmd`](../assets/arquitetura.mmd)).
+
+![Diagrama de arquitetura do EV ChargeOps](../assets/arquitetura.png)
+
+### Camada física — o carregador e a instalação
+
+O ponto de recarga é o **GoodWe HCA G2** (7/11/22 kW, conector IEC Tipo 2, enquadrado como modo 3 da IEC 61851-1 — Frente 2, seção do carregador): wallbox CA com **leitor RFID** na partida (a chave da atribuição de sessão a usuário), **medição embarcada** de energia e potência e, opcionalmente, **medidor MID no RS-485** — a fonte de kWh com lastro metrológico que a Frente 2 recomendou rastrear pelo campo `measurement_source` desde o primeiro dia. A instalação obedece ao quadro mapeado na Frente 2, Opção A: IT-41 do CBPMESP (circuito exclusivo com DR individual, desligamento de emergência interligado ao alarme de incêndio, homologação ANATEL da comunicação sem fio) e as NBR 5410, NBR 17019 e NBR IEC 61851-1 que ela referencia, sob responsabilidade técnica registrada. A plataforma **cadastra** o responsável técnico e o documento de responsabilidade por SAVE — ela não substitui o projeto elétrico nem o estudo de demanda do profissional habilitado (IT-41, item 5.9.4); fornece a curva de carga real que o complementa.
+
+### Camada de conectividade — rede, protocolos e a ingestão plugável
+
+O HCA G2 conversa com o mundo por **LAN (RJ45) ou Wi-Fi** até o roteador da garagem (LAN preferível em subsolo — Frente 2) e declara um único protocolo: **Modbus TCP**. Não há OCPP nativo documentado, e a GoodWe não disponibilizará acesso à API SEMS para o desafio. A resposta arquitetural, fundamentada na Frente 2, é uma **camada de ingestão plugável**: três fontes intercambiáveis alimentam um **gateway de ingestão** que normaliza tudo para o modelo interno **OCPP-compatível** (sessão = StartTransaction → MeterValues → StopTransaction, o vocabulário da Frente 1):
+
+1. **Adaptador SEMS (*stub*)** — implementa o contrato espelhado da documentação pública e comunitária (Frente 2, seção da API SEMS); especificado e adiável: vira integração real se e quando houver acesso, sem mexer no resto.
+2. **Gerador sintético** — produz sessões e telemetria diretamente no esquema da Opção C, calibrado no dataset público (Opção B, seção de cold start).
+3. **Dataset Kaggle** — as 3.395 sessões reais de Asensio et al., mapeadas campo a campo no contrato (Opção B).
+
+Trocar de fonte é trocar de adaptador, não refatorar — a aposta verificável já declarada na Opção B. O **adaptador Modbus TCP local** fica registrado como candidato a caminho real de telemetria numa instalação própria (Frente 2, Análise da equipe). O desenho responde ao art. 552 da REN 1.000 (protocolos abertos para comunicação e supervisão) por espírito, não só por letra: o modelo interno nasce aberto e portável para qualquer carregador OCPP futuro.
+
+### Camada de aplicação — back-end, regras de negócio e IA
+
+O back-end é um pipeline de seis estágios, cada um já especificado em sua seção:
+
+1. **Ingestão** — o gateway grava os eventos normalizados.
+2. **Validação e atribuição** — resolve o `auth_id` bruto → `credential` → `app_user` → `unit` (decisão 2 da Opção C); visitante segue trilho próprio, fora do rateio.
+3. **Persistência** — o esquema de 14 entidades da Opção C: `charging_session` como entidade central, `telemetry_reading` como série temporal, tarifas versionadas por vigência, faturas e linhas.
+4. **Motor de rateio** — a fórmula da Opção A (kWh medido × tarifa snapshot + `C_disp / N_aderentes`), com a reconciliação em dois tempos da decisão 5 da Opção C (tarifa provisória na sessão, linha de ajuste no fechamento seguinte).
+5. **Módulos de IA** — as abordagens 1 (previsão de demanda e ocupação) e 3 (detecção de anomalias) da Opção B, lendo **das mesmas tabelas que o motor de faturamento escreve** — sem pipeline paralelo de coleta.
+6. **Geração de fatura** — `invoice` + `invoice_line`, com a fila de auditoria (linhas flagradas) resolvida antes do fechamento.
+
+### Camada de apresentação — as interfaces do gestor e do morador
+
+Duas interfaces, uma por persona, ambas consumindo apenas saídas das camadas anteriores:
+
+- **Painel do gestor (síndico/administradora):** ocupação e saúde dos pontos (o caso Copel da Frente 1 fez disso funcionalidade de primeira classe), curva prevista de 7 dias com alertas de saturação e de limite de potência (Opção B, abordagem 1), **fila de auditoria** de anomalias com aceitar/contestar antes do fechamento da fatura (abordagem 3) e relatórios exportáveis para assembleia — exigência derivada da responsabilidade legal do síndico (Frente 1), incluindo a curva de carga real que alimenta a renovação do AVCB (IT-41, item 5.9.4).
+- **Portal do morador:** extrato sessão a sessão (credencial, kWh, motivo de encerramento), fatura mensal com linhas explicadas (inclusive o ajuste de reconciliação), melhor janela de recarga prevista para o perfil dele e contestação informada das sessões sinalizadas.
 
 ## Fluxo de dados: da sessão à fatura
-<!-- a preencher -->
+
+O caminho ponta a ponta, numerado. Os passos 1–4 acontecem no equipamento — na Sprint 2 são produzidos pelo gerador sintético e pelo dataset Kaggle, que entregam os mesmos eventos ao passo 5; do passo 5 em diante é a plataforma:
+
+1. **Conexão.** Cabo plugado, o carregador detecta o veículo (estados do Control Pilot — Frente 1, anatomia da sessão); a telemetria muda para `connected`.
+2. **Autenticação.** Cartão RFID (ou app) na partida; o carregador valida a credencial e libera a energia. O identificador bruto (`auth_id`) acompanha a sessão dali em diante.
+3. **Sessão e telemetria.** A abertura registra leitura inicial do medidor e timestamp; durante a carga, amostras periódicas de potência e energia acumulada (os MeterValues da Frente 1) e heartbeats de saúde do ponto — inclusive fora de sessão.
+4. **Encerramento.** Por bateria cheia, desconexão, queda de energia ou comando: leitura final, timestamp e **motivo do encerramento** (`stop_reason`).
+5. **Ingestão e normalização.** O gateway traduz a fonte ativa (*stub* SEMS / gerador sintético / dataset Kaggle; futuramente, Modbus TCP local) para o modelo OCPP-compatível e grava `charging_session` e `telemetry_reading`.
+6. **Validação e atribuição.** `auth_id` → credencial → unidade (a sessão guarda o bruto e a FK resolvida — decisão 2 da Opção C); no encerramento, grava-se o snapshot da tarifa provisória vigente (`applied_tariff_kwh`). Caso degenerado: leitura final perdida → energia pela última telemetria + flag de auditoria (caso 1 da Opção A).
+7. **A IA intercepta — antes do fechamento.** A detecção de anomalias (Opção B, abordagem 3) avalia cada sessão encerrada e a saúde dos pontos; as flags, com explicação legível, entram na **fila de auditoria** e a linha de fatura correspondente nasce marcada (`flagged_for_audit`) — o gestor aceita ou contesta **antes** de a fatura fechar, nunca depois. Em paralelo, a previsão de demanda (abordagem 1) consome os agregados das mesmas tabelas e publica curva e alertas no painel — decisão operacional, sem efeito na fatura.
+8. **Agregação mensal.** No fechamento da competência: `S_u` por unidade (sessão pertence ao mês civil do início), `N_aderentes` reconstruído de `program_enrollment`.
+9. **Rateio e fatura.** A fórmula da Opção A, linha a linha com `round2` half-up: uma linha por sessão, uma da taxa de disponibilidade e, quando houver, a linha de ajuste da reconciliação da competência anterior (decisão 5 da Opção C). A `invoice` percorre `draft` → `under_review` (se há linhas em auditoria) → `closed`.
+10. **Notificação e prestação de contas.** O morador recebe fatura e extrato no portal; o valor segue o trilho do boleto condominial existente (benchmark da Opção A — a integração financeira é da administradora, não nossa). O gestor exporta o relatório mensal — receita, kWh, resíduos de arredondamento declarados, flags e suas resoluções — para a assembleia.
+
+O ciclo tem ainda um laço de retorno: quando a fatura da distribuidora da competência `M` chega, o sistema apura o R$/kWh efetivo, registra em `tariff_reconciliation` e a fatura de `M+1` carrega o ajuste por unidade — o mecanismo completo está na decisão 5 da Opção C, demonstrado com números no mês fictício.
+
+### Análise da equipe
+
+A leitura em quatro camadas não foi o ponto de partida do projeto — foi o teste final: as decisões nasceram de baixo para cima, das restrições documentadas nas Frentes 1 e 2, e o fato de se organizarem nas camadas do enunciado sem sobrar caixa órfã é o que dá confiança na costura. A assimetria deliberada do diagrama merece ser explicitada: a camada de conectividade, que numa arquitetura típica seria a mais fina (um broker OCPP e pronto), é aqui a mais carregada de decisão — porque é onde mora a dupla restrição real do projeto (carregador sem OCPP nativo documentado + API do fabricante inacessível), e a ingestão plugável com três fontes intercambiáveis é a restrição transformada em arquitetura, não contornada. O segundo traço distintivo é a posição da IA no fluxo: ela não é um estágio depois da fatura (dashboard que comenta o passado), é uma **interceptação entre a sessão e o fechamento** — a fila de auditoria do passo 7 é a materialização do critério "estrutural, não decorativo" da Opção B, e removê-la quebraria o próprio estado `under_review` da fatura. A fragilidade que registramos com a mesma franqueza: os passos 1–4 do fluxo são, hoje, especificação sem verificação — nenhum evento real de um HCA G2 atravessou este pipeline, e o contrato da camada de conectividade é hipótese documentada (Frente 2, com níveis de confiabilidade declarados). O desenho inteiro aposta que, quando o evento real chegar, ele entra pelo mesmo gateway sem mover nenhuma caixa das outras três camadas; é uma aposta com fundamento — o modelo interno espelha o OCPP, padrão verificado na Frente 1 — mas só a Sprint 2 a testa de ponta a ponta sobre dados sintéticos, e só uma instalação real a cobra de verdade.
 
 ## Opção A — Benchmark e modelo de rateio
 

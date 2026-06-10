@@ -1,0 +1,57 @@
+%% EV ChargeOps — diagrama de arquitetura (Frente 3, corpo obrigatório)
+%% Renderizar: npx -y @mermaid-js/mermaid-cli -i assets/arquitetura.mmd -o assets/arquitetura.png -b white
+flowchart TB
+    subgraph FIS["1. Camada física"]
+        direction LR
+        MID["Medidor MID<br>(RS-485, opcional)"]
+        CP["Carregador GoodWe HCA G2<br>RFID + medição embarcada"]
+    end
+
+    subgraph CON["2. Camada de conectividade — ingestão plugável"]
+        direction TB
+        SEMS["Adaptador SEMS<br>(stub)"]
+        SYN["Gerador<br>sintético"]
+        KAG["Dataset<br>Kaggle"]
+        GW["Gateway de ingestão<br>normaliza p/ modelo OCPP-compatível"]
+    end
+
+    subgraph APP["3. Camada de aplicação"]
+        VAL["Validação e atribuição<br>credencial → unidade"]
+        DB[("Base de dados<br>14 entidades — Opção C")]
+        IA1["IA: previsão de<br>demanda e ocupação"]
+        IA3["IA: detecção<br>de anomalias"]
+        FILA["Fila de<br>auditoria"]
+        RAT["Motor de rateio<br>kWh + taxa + reconciliação"]
+        FAT["Geração<br>de fatura"]
+    end
+
+    subgraph PRES["4. Camada de apresentação"]
+        direction LR
+        PG["Painel do gestor<br>alertas, auditoria, relatórios"]
+        PM["Portal do morador<br>extrato, fatura, melhor janela"]
+    end
+
+    MID -. "kWh certificado" .-> CP
+    CP -. "LAN / Wi-Fi<br>(Modbus TCP / nuvem SEMS)" .-> SEMS
+    SEMS --> GW
+    SYN --> GW
+    KAG --> GW
+    GW ==> VAL
+    VAL ==> DB
+    DB ==> RAT
+    RAT ==> FAT
+    DB --> IA1
+    DB --> IA3
+    IA3 --> FILA
+    FILA --> FAT
+    IA1 --> PG
+    IA1 --> PM
+    FAT ==> PG
+    FAT ==> PM
+
+    classDef fonte fill:#ffffff,stroke:#888888,stroke-dasharray:6 4
+    classDef ia fill:#f3e3fa,stroke:#8e44ad,stroke-width:2px
+    classDef dados fill:#e8f0fe,stroke:#3367d6
+    class SEMS,SYN,KAG fonte
+    class IA1,IA3,FILA ia
+    class DB dados

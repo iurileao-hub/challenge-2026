@@ -175,37 +175,38 @@ Todas as fontes abaixo foram efetivamente consultadas pela equipe, com acesso ve
 39. App Store — "Eletroposto Fácil" (Copel). https://apps.apple.com/br/app/eletroposto-f%C3%A1cil/id1610189111
 40. OCPP.md — "OCPP 1.6J — Open Charge Point Protocol (JSON over WebSocket)". https://ocpp.md/ocpp-1.6j/
 41. Monta — "IEC 61851: Definition, scope, and role in EV charging". https://monta.com/en/blog/iec-61851/
-42. Wikipedia — "SAE J1772" (sinalização Control Pilot/PWM). https://en.wikipedia.org/wiki/SAE_J1772
-43. Wikipedia — "ISO 15118" (Plug & Charge, V2G). https://en.wikipedia.org/wiki/ISO_15118
+42. HDT Electronic — "How does EVSE work? What are control pilot and proximity contact signals?" (estados A/B/C e PWM do Control Pilot). https://www.hdt-electronic.com/en/faq/how-does-evse-work-what-are-control-pilot-and-proximity-contact-signals/
+43. Typhoon HIL — "Electric vehicle charging according to standard IEC 62196 – mode 3" (duty cycle → corrente máxima). https://www.typhoon-hil.com/documentation/typhoon-hil-application-notes/References/electric_vehicle_ac_charging.html
+44. Monta — "ISO 15118: Definition, key features, benefits, adoption, and compliance" (Plug & Charge, V2G). https://monta.com/en/blog/iso-15118/
 
 ### Acadêmicas, datasets e bibliotecas
 
-44. Kaggle — "Electric Vehicle Charging Dataset" (Michael Bryant; reempacotamento do dado de Asensio et al.). https://www.kaggle.com/datasets/michaelbryantds/electric-vehicle-charging-dataset
-45. Asensio, O. I.; Lawson, M. C.; Apablaza, C. Z. — "Electric vehicle charging stations in the workplace with high-resolution data from casual and habitual users". Scientific Data, v. 8, art. 168, 2021. https://pmc.ncbi.nlm.nih.gov/articles/PMC8263557/ — DOI: https://doi.org/10.1038/s41597-021-00956-1
-46. Harvard Dataverse — depósito primário do dataset de Asensio et al. https://doi.org/10.7910/DVN/QF1PMO
-47. Helmus, J. R.; Lees, M. H.; van den Hoed, R. — "A data driven typology of electric vehicle user types and charging sessions". Transportation Research Part C, v. 115, 2020. https://research.hva.nl/en/publications/a-data-driven-typology-of-electric-vehicle-user-types-and-chargin/ — DOI: https://doi.org/10.1016/j.trc.2020.102637
-48. scikit-learn — exemplo oficial "Time-related feature engineering". https://scikit-learn.org/stable/auto_examples/applications/plot_cyclical_feature_engineering.html
-49. scikit-learn — guia do usuário "Clustering". https://scikit-learn.org/stable/modules/clustering.html
-50. scikit-learn — referência da API `sklearn.ensemble.IsolationForest`. https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html
-51. scikit-learn — guia do usuário "Novelty and Outlier Detection". https://scikit-learn.org/stable/modules/outlier_detection.html
-52. statsmodels — documentação oficial do módulo de séries temporais `statsmodels.tsa`. https://www.statsmodels.org/stable/tsa.html
+45. Kaggle — "Electric Vehicle Charging Dataset" (Michael Bryant; reempacotamento do dado de Asensio et al.). https://www.kaggle.com/datasets/michaelbryantds/electric-vehicle-charging-dataset
+46. Asensio, O. I.; Lawson, M. C.; Apablaza, C. Z. — "Electric vehicle charging stations in the workplace with high-resolution data from casual and habitual users". Scientific Data, v. 8, art. 168, 2021. https://pmc.ncbi.nlm.nih.gov/articles/PMC8263557/ — DOI: https://doi.org/10.1038/s41597-021-00956-1
+47. Harvard Dataverse — depósito primário do dataset de Asensio et al. https://doi.org/10.7910/DVN/QF1PMO
+48. Helmus, J. R.; Lees, M. H.; van den Hoed, R. — "A data driven typology of electric vehicle user types and charging sessions". Transportation Research Part C, v. 115, 2020. https://research.hva.nl/en/publications/a-data-driven-typology-of-electric-vehicle-user-types-and-chargin/ — DOI: https://doi.org/10.1016/j.trc.2020.102637
+49. scikit-learn — exemplo oficial "Time-related feature engineering". https://scikit-learn.org/stable/auto_examples/applications/plot_cyclical_feature_engineering.html
+50. scikit-learn — guia do usuário "Clustering". https://scikit-learn.org/stable/modules/clustering.html
+51. scikit-learn — referência da API `sklearn.ensemble.IsolationForest`. https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html
+52. scikit-learn — guia do usuário "Novelty and Outlier Detection". https://scikit-learn.org/stable/modules/outlier_detection.html
+53. statsmodels — documentação oficial do módulo de séries temporais `statsmodels.tsa`. https://www.statsmodels.org/stable/tsa.html
 
 ### Mercado e imprensa especializada
 
-53. Migalhas — "Lei 18.403/26 de SP: Recarga de veículos elétricos em condomínios". https://www.migalhas.com.br/coluna/migalhas-edilicias/452093/lei-18-403-26-de-sp-recarga-de-veiculos-eletricos-em-condominios
-54. MyCond — "Desafios para Carregadores de Carros Elétricos em Condomínios". https://mycond.com.br/desafios-para-carregadores-de-carros-eletricos-em-condominios/
-55. Lello Condomínios — "Veículos elétricos em condomínios: o que diz a legislação". https://www.lellocondominios.com.br/veiculos-eletricos-em-condominios-o-que-diz-a-legislacao-como-instalar-e-quais-cuidados-os-sindicos-precisam-ter/
-56. Power2Go — "Condomínios: carregadores individuais ou compartilhados?". https://www.power2go.com.br/post/condom%C3%ADnios-carregadores-individuais-ou-compartilhados
-57. Carregados — "Quanto custa para carregar um carro elétrico no Brasil?". https://carregados.com.br/quanto-custa-para-carregar-um-carro-eletrico
-58. GreenV — "Eletroposto: o que é, como funciona e quanto custa abastecer". https://www.greenv.com.br/blog/eletroposto-o-que-e-como-funciona-e-quanto-custa-abastecer/
-59. Zletric — "Zletric e VoltBras criam rede com mais de 2.500 eletropostos interoperáveis no Brasil". https://www.zletric.com.br/post/zletric-e-voltbras-criam-rede-com-mais-de-2500-eletropostos-interoperaveis-no-brasil
-60. CanalVE — "Como funciona o protocolo OCPP na recarga de carros elétricos?". https://canalve.com.br/como-funciona-o-protocolo-ocpp-nas-recargas-de-carros-eletricos/
-61. EV Connect — "New ChargePoint Fees: What's Changing and Who Pays More". https://www.evconnect.com/blog/chargepoint-raises-fees-in-2026/
-62. Ambare — "Carregamento compartilhado em condomínios: como funciona e quem paga a conta?". https://ambare.com.br/carregamento-compartilhado-em-condominios-como-funciona-e-quem-paga-a-conta/
-63. CondoCash — "Carregador de carro elétrico em condomínio: instalação, custos e rateio". https://condocash.com.br/carregador-de-carro-eletrico-em-condominio-instalacao-custos-e-rateio/
-64. Fecombustíveis (reprodução de O Globo) — "Venda de carros eletrificados no Brasil cresce 91% em 2023". https://www.fecombustiveis.org.br/noticia/venda-de-carros-eletrificados-no-brasil-cresce-91-em-2023-e-atinge-939-mil-emplacamentos/255655
-65. ClimaInfo — "Pontos de recarga de VEs crescem 59% no Brasil, mas distribuição é desigual". https://climainfo.org.br/2025/09/18/pontos-de-recarga-de-ves-crescem-59-no-brasil-mas-distribuicao-e-desigual/
-66. Latam Mobility — "O Brasil alcança 16.880 pontos de recarga públicos e semipúblicos". https://latamobility.com/pt-br/o-brasil-alcanca-16-880-pontos-de-recarga-publicos-e-semipublicos-para-veiculos-eletricos/
-67. AutoIndústria — "A nova geografia da recarga elétrica no Brasil". https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
-68. Aranda/FotoVolt — "Aneel abre consulta para regras de recarga de veículos elétricos". https://www.arandanet.com.br/revista/fotovolt/noticia/12147-Aneel-abre-consulta-para-regras-de-recarga-de-veiculos-eletricos.html
-69. Agência SP — "Corpo de Bombeiros de SP divulga novas regras de segurança para recarga de carros elétricos no estado". https://www.agenciasp.sp.gov.br/corpo-de-bombeiros-de-sp-divulga-novas-regras-de-seguranca-para-recarga-de-carros-eletricos-no-estado/
+54. Migalhas — "Lei 18.403/26 de SP: Recarga de veículos elétricos em condomínios". https://www.migalhas.com.br/coluna/migalhas-edilicias/452093/lei-18-403-26-de-sp-recarga-de-veiculos-eletricos-em-condominios
+55. MyCond — "Desafios para Carregadores de Carros Elétricos em Condomínios". https://mycond.com.br/desafios-para-carregadores-de-carros-eletricos-em-condominios/
+56. Lello Condomínios — "Veículos elétricos em condomínios: o que diz a legislação". https://www.lellocondominios.com.br/veiculos-eletricos-em-condominios-o-que-diz-a-legislacao-como-instalar-e-quais-cuidados-os-sindicos-precisam-ter/
+57. Power2Go — "Condomínios: carregadores individuais ou compartilhados?". https://www.power2go.com.br/post/condom%C3%ADnios-carregadores-individuais-ou-compartilhados
+58. Carregados — "Quanto custa para carregar um carro elétrico no Brasil?". https://carregados.com.br/quanto-custa-para-carregar-um-carro-eletrico
+59. GreenV — "Eletroposto: o que é, como funciona e quanto custa abastecer". https://www.greenv.com.br/blog/eletroposto-o-que-e-como-funciona-e-quanto-custa-abastecer/
+60. Zletric — "Zletric e VoltBras criam rede com mais de 2.500 eletropostos interoperáveis no Brasil". https://www.zletric.com.br/post/zletric-e-voltbras-criam-rede-com-mais-de-2500-eletropostos-interoperaveis-no-brasil
+61. CanalVE — "Como funciona o protocolo OCPP na recarga de carros elétricos?". https://canalve.com.br/como-funciona-o-protocolo-ocpp-nas-recargas-de-carros-eletricos/
+62. EV Connect — "New ChargePoint Fees: What's Changing and Who Pays More". https://www.evconnect.com/blog/chargepoint-raises-fees-in-2026/
+63. Ambare — "Carregamento compartilhado em condomínios: como funciona e quem paga a conta?". https://ambare.com.br/carregamento-compartilhado-em-condominios-como-funciona-e-quem-paga-a-conta/
+64. CondoCash — "Carregador de carro elétrico em condomínio: instalação, custos e rateio". https://condocash.com.br/carregador-de-carro-eletrico-em-condominio-instalacao-custos-e-rateio/
+65. Fecombustíveis (reprodução de O Globo) — "Venda de carros eletrificados no Brasil cresce 91% em 2023". https://www.fecombustiveis.org.br/noticia/venda-de-carros-eletrificados-no-brasil-cresce-91-em-2023-e-atinge-939-mil-emplacamentos/255655
+66. ClimaInfo — "Pontos de recarga de VEs crescem 59% no Brasil, mas distribuição é desigual". https://climainfo.org.br/2025/09/18/pontos-de-recarga-de-ves-crescem-59-no-brasil-mas-distribuicao-e-desigual/
+67. Latam Mobility — "O Brasil alcança 16.880 pontos de recarga públicos e semipúblicos". https://latamobility.com/pt-br/o-brasil-alcanca-16-880-pontos-de-recarga-publicos-e-semipublicos-para-veiculos-eletricos/
+68. AutoIndústria — "A nova geografia da recarga elétrica no Brasil". https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
+69. Aranda/FotoVolt — "Aneel abre consulta para regras de recarga de veículos elétricos". https://www.arandanet.com.br/revista/fotovolt/noticia/12147-Aneel-abre-consulta-para-regras-de-recarga-de-veiculos-eletricos.html
+70. Agência SP — "Corpo de Bombeiros de SP divulga novas regras de segurança para recarga de carros elétricos no estado". https://www.agenciasp.sp.gov.br/corpo-de-bombeiros-de-sp-divulga-novas-regras-de-seguranca-para-recarga-de-carros-eletricos-no-estado/

@@ -1,5 +1,7 @@
 # Frente 1 — Contexto e Problema
 
+> **Nota terminológica.** Neste dossiê (e nos demais), "carregador" designa o equipamento físico (wallbox/EVSE); "eletroposto" designa o ponto público de recarga; "estação de recarga" é o termo regulatório da REN ANEEL 1.000/2021 para a instalação completa.
+
 ## Recarga compartilhada e desafios operacionais
 
 ### Contexto: a frota eletrificada cresce mais rápido que a infraestrutura de gestão
@@ -13,8 +15,8 @@ A literatura de mercado e a cobertura especializada convergem em um conjunto rec
 1. **Limite de potência da instalação.** Um EV em recarga AC pode consumir o equivalente a um apartamento inteiro com todos os eletrodomésticos ligados. Edifícios antigos não foram dimensionados para recargas simultâneas, e a entrada de energia do condomínio é um teto físico: sem gerenciamento, poucas recargas concorrentes podem derrubar o quadro geral [MyCond, 2026; Power2Go, 2026].
 2. **Rateio justo do consumo.** Quando o carregador é alimentado pela área comum, sem medição individualizada o custo da energia de poucos moradores é diluído na taxa condominial de todos — fonte direta de conflito em assembleia. A orientação dominante é que "a energia deve ser individualizada, evitando subsídios entre usuários e não usuários" [Lello Condomínios, 2026].
 3. **Disputa por carregadores compartilhados.** Quando a avaliação de carga conclui que só cabem um ou dois pontos coletivos, surge o problema de fila: tempo máximo de uso, agendamento, veículo que termina a recarga e continua ocupando a vaga. "Gerenciar a disponibilidade dos carregadores compartilhados pode se tornar complicado" à medida que a frota interna cresce [Power2Go, 2026].
-4. **Segurança e conformidade técnica.** A instalação exige laudo elétrico, ART de engenheiro habilitado e aderência às normas ABNT NBR 5410, NBR 17019 e NBR IEC 61851-1; em São Paulo, o Corpo de Bombeiros atualizou a IT-41 em novembro de 2025 com requisitos específicos para sistemas de alimentação de veículos elétricos (S.A.V.E.) [Lello Condomínios, 2026]. O síndico responde legalmente pela conformidade.
-5. **Governança e vácuo normativo.** A Lei estadual paulista nº 18.403/2026 garantiu ao condômino o direito de instalar ponto de recarga na vaga privativa às suas expensas, invertendo a lógica anterior (a negativa agora exige laudo técnico fundamentado). Mas a própria lei silencia sobre rateio de obras coletivas, vagas rotativas e impactos da instalação individual na capacidade futura dos demais — lacunas que recaem sobre o gestor [Migalhas, 2026].
+4. **Segurança e conformidade técnica.** A instalação exige laudo elétrico, ART de engenheiro habilitado e aderência às normas ABNT NBR 5410, NBR 17019 e NBR IEC 61851-1; em São Paulo, o Corpo de Bombeiros (CBPMESP) atualizou a IT-41 com requisitos específicos para os SAVE (Sistemas de Alimentação de Veículos Elétricos) — a consulta pública foi aberta em novembro de 2025 (Portaria nº CCB-008/800/2025) e a atualização efetiva veio com a Portaria nº CCB-003/970/2026, de 17/03/2026 [Lello Condomínios, 2026; fontes primárias na Frente 2]. O síndico responde legalmente pela conformidade.
+5. **Governança e vácuo normativo.** A Lei estadual paulista nº 18.403/2026 garantiu ao condômino o direito de instalar ponto de recarga na vaga privativa às suas expensas, invertendo a lógica anterior (a negativa agora exige "justificativa técnica ou de segurança devidamente fundamentada e documentada", nos termos do art. 1º, § 2º). Mas a própria lei silencia sobre rateio de obras coletivas, vagas rotativas e impactos da instalação individual na capacidade futura dos demais — lacunas que recaem sobre o gestor [Migalhas, 2026].
 
 ### Análise da equipe
 
@@ -26,10 +28,10 @@ Entender o que acontece entre "plugar o cabo" e "receber a conta" é pré-requis
 
 ### Ciclo de vida de uma sessão (recarga AC, Modo 3)
 
-1. **Plug-in e detecção.** O conector é inserido. O carregador (EVSE) detecta a presença do veículo pelo circuito *Control Pilot* (CP): o veículo altera a resistência entre CP e terra, sinalizando os estados padronizados — A (sem veículo), B (veículo detectado), C (pronto para carregar) [Wikipedia/SAE J1772, acesso 2026].
-2. **Negociação de corrente.** A norma IEC 61851 define quatro modos de carga (Modo 1: tomada comum sem controle; Modo 2: cabo com proteção embarcada; Modo 3: carregador AC dedicado com sinalização completa; Modo 4: recarga DC com carregador externo) [Monta, 2026]. No Modo 3, o carregador gera no CP uma onda quadrada de 1 kHz a ±12 V, e o *duty cycle* do PWM codifica a corrente máxima permitida (ex.: 25% ≈ 16 A, 50% ≈ 32 A) [Wikipedia/SAE J1772, acesso 2026]. É por esse mecanismo que sistemas de balanceamento de carga reduzem dinamicamente a corrente de cada vaga quando o prédio se aproxima do limite.
-3. **Autenticação e autorização.** Quem paga precisa ser identificado antes de liberar energia. Os métodos usuais: cartão RFID encostado no leitor, aplicativo (QR code ou seleção do ponto) ou, nos sistemas mais novos, **Plug & Charge** da ISO 15118 — o veículo e o carregador trocam certificados digitais e a autenticação acontece automaticamente ao conectar o cabo, sem nenhuma ação do motorista [Wikipedia/ISO 15118, acesso 2026]. A ISO 15118 define a camada de comunicação digital de alto nível (identificação segura, smart charging, V2G) que opera sobre a base elétrica da IEC 61851.
-4. **Energização e medição contínua.** Autorizada a sessão, o contator fecha e a energia flui. O medidor embarcado registra continuamente energia acumulada (kWh), potência instantânea (kW), corrente, tensão e duração. Em equipamentos voltados a cobrança, a medição é certificada (ex.: MID na Europa, citada pela Zaptec como base de faturamento) [Zaptec, 2026].
+1. **Plug-in e detecção.** O conector é inserido. O carregador (EVSE) detecta a presença do veículo pelo circuito *Control Pilot* (CP): o veículo altera a resistência entre CP e terra, sinalizando os estados padronizados — A (sem veículo), B (veículo detectado), C (pronto para carregar) [HDT Electronic, 2026].
+2. **Negociação de corrente.** A norma IEC 61851 define quatro modos de carga (Modo 1: tomada comum sem controle; Modo 2: cabo com proteção embarcada; Modo 3: carregador AC dedicado com sinalização completa; Modo 4: recarga DC com carregador externo) [Monta, 2026]. No Modo 3, o carregador gera no CP uma onda quadrada de 1 kHz a ±12 V, e o *duty cycle* do PWM codifica a corrente máxima permitida (regra de ≈0,6 A por ponto percentual de *duty cycle*: ex., 50% → 30 A) [HDT Electronic, 2026; Typhoon HIL, 2026]. É por esse mecanismo que sistemas de balanceamento de carga reduzem dinamicamente a corrente de cada vaga quando o prédio se aproxima do limite.
+3. **Autenticação e autorização.** Quem paga precisa ser identificado antes de liberar energia. Os métodos usuais: cartão RFID encostado no leitor, aplicativo (QR code ou seleção do ponto) ou, nos sistemas mais novos, **Plug & Charge** da ISO 15118 — o veículo e o carregador trocam certificados digitais e a autenticação acontece automaticamente ao conectar o cabo, sem nenhuma ação do motorista [Monta ISO 15118, 2026]. A ISO 15118 define a camada de comunicação digital de alto nível (identificação segura, smart charging, V2G) que opera sobre a base elétrica da IEC 61851 [Monta, 2026; Monta ISO 15118, 2026].
+4. **Energização e medição contínua.** Autorizada a sessão, o contator fecha e a energia flui. O medidor embarcado registra continuamente energia acumulada (kWh), potência instantânea (kW), corrente, tensão e duração. Em equipamentos voltados a cobrança, a medição é certificada (ex.: MID na Europa — Measuring Instruments Directive, certificação metrológica que habilita o medidor para cobrança —, citada pela Zaptec como base de faturamento) [Zaptec, 2026].
 5. **Encerramento.** A sessão termina por bateria cheia, desconexão do cabo, comando remoto ou regra de negócio (tempo máximo). O carregador registra o motivo do encerramento e a leitura final do medidor.
 6. **Registro e cobrança.** O consumo da sessão (kWh entre leitura inicial e final), atribuído ao usuário autenticado, vira o lançamento de cobrança ou rateio.
 
@@ -118,7 +120,10 @@ Mapeamos quatro soluções existentes que tangenciam o problema do EV ChargeOps,
 Lendo as quatro soluções em conjunto, o mercado se divide em dois eixos: **excelência de hardware/energia** (Zaptec resolve o limite de potência melhor que todos, mas prende a inteligência na própria nuvem) e **excelência de operação comercial** (ChargePoint resolve a cobrança individual melhor que todos, mas a custo recorrente alto e fora do contexto jurídico brasileiro). O player nacional (NeoCharge) é o mais próximo do nosso problema, porém empacota gestão com hardware próprio e não exibe camada analítica. Nenhuma das quatro oferece, simultaneamente: (1) **rateio condominial nativo do Brasil** — integrado a boleto, assembleia e à realidade da Lei 18.403/26; (2) **neutralidade de hardware via OCPP** — funcionar com qualquer carregador compatível, evitando o lock-in que Zaptec e NeoCharge praticam por desenho; e (3) **IA operacional sobre a telemetria** — previsão de pico contra a demanda contratada, detecção de anomalia de consumo, sugestão de janelas e simulação de modelos tarifários. Essa interseção vazia é o posicionamento do EV ChargeOps. O contraexemplo da Copel acrescenta um alerta de execução: plataforma sem operação confiável (eletropostos inativos, suporte ausente) destrói a confiança do usuário mais rápido do que qualquer funcionalidade a constrói — monitoramento de saúde dos pontos (via Heartbeat/StatusNotification do OCPP) deve ser tratado como funcionalidade de primeira classe, não acessório.
 
 ## Opção B — Pesquisa com usuários
-<!-- a preencher -->
+
+*Em andamento.* O roteiro está pronto em [`docs/entrevistas/roteiro.md`](entrevistas/roteiro.md) e as entrevistas estão em aplicação pela equipe; respostas e insights serão incorporados a esta seção antes da entrega.
+
+<!-- a preencher: respostas e insights das entrevistas -->
 
 ## Opção C — Análise de dados públicos
 
@@ -171,39 +176,40 @@ Todas as fontes abaixo foram acessadas e verificadas em 2026-06-09.
 **Anatomia técnica da sessão**
 
 6. Monta — "IEC 61851: Definition, scope, and role in EV charging". https://monta.com/en/blog/iec-61851/
-7. Wikipedia — "SAE J1772" (sinalização Control Pilot/PWM compartilhada com IEC 61851 Modo 3). https://en.wikipedia.org/wiki/SAE_J1772
-8. Wikipedia — "ISO 15118" (Plug & Charge, V2G). https://en.wikipedia.org/wiki/ISO_15118
-9. OCPP.md — "OCPP 1.6J — Open Charge Point Protocol (JSON over WebSocket)". https://ocpp.md/ocpp-1.6j/
-10. CanalVE — "Como funciona o protocolo OCPP na recarga de carros elétricos?". https://canalve.com.br/como-funciona-o-protocolo-ocpp-nas-recargas-de-carros-eletricos/
+7. HDT Electronic — "How does EVSE work? What are control pilot and proximity contact signals?" (estados A/B/C sinalizados por resistência no Control Pilot; PWM de 1 kHz ±12 V com a corrente máxima). https://www.hdt-electronic.com/en/faq/how-does-evse-work-what-are-control-pilot-and-proximity-contact-signals/
+8. Typhoon HIL — "Electric vehicle charging according to standard IEC 62196 – mode 3" (regra de 0,6 A por ponto percentual de duty cycle; exemplo 50% → 30 A). https://www.typhoon-hil.com/documentation/typhoon-hil-application-notes/References/electric_vehicle_ac_charging.html
+9. Monta — "ISO 15118: Definition, key features, benefits, adoption, and compliance" (Plug & Charge por troca de certificados digitais; camada digital de alto nível, smart charging e V2G). https://monta.com/en/blog/iso-15118/
+10. OCPP.md — "OCPP 1.6J — Open Charge Point Protocol (JSON over WebSocket)". https://ocpp.md/ocpp-1.6j/
+11. CanalVE — "Como funciona o protocolo OCPP na recarga de carros elétricos?". https://canalve.com.br/como-funciona-o-protocolo-ocpp-nas-recargas-de-carros-eletricos/
 
 **Modelos de negócio**
 
-11. ANEEL — "Veículos Elétricos" (REN 819/2018 e REN 1.000/2021, preços livremente negociados). https://www.gov.br/aneel/pt-br/assuntos/veiculos-eletricos
-12. Carregados — "Quanto custa para carregar um carro elétrico no Brasil?". https://carregados.com.br/quanto-custa-para-carregar-um-carro-eletrico
-13. GreenV — "Eletroposto: o que é, como funciona e quanto custa abastecer". https://www.greenv.com.br/blog/eletroposto-o-que-e-como-funciona-e-quanto-custa-abastecer/
-14. Zletric — "Zletric e VoltBras criam rede com mais de 2.500 eletropostos interoperáveis no Brasil". https://www.zletric.com.br/post/zletric-e-voltbras-criam-rede-com-mais-de-2500-eletropostos-interoperaveis-no-brasil
+12. ANEEL — "Veículos Elétricos" (REN 819/2018 e REN 1.000/2021, preços livremente negociados). https://www.gov.br/aneel/pt-br/assuntos/veiculos-eletricos
+13. Carregados — "Quanto custa para carregar um carro elétrico no Brasil?". https://carregados.com.br/quanto-custa-para-carregar-um-carro-eletrico
+14. GreenV — "Eletroposto: o que é, como funciona e quanto custa abastecer". https://www.greenv.com.br/blog/eletroposto-o-que-e-como-funciona-e-quanto-custa-abastecer/
+15. Zletric — "Zletric e VoltBras criam rede com mais de 2.500 eletropostos interoperáveis no Brasil". https://www.zletric.com.br/post/zletric-e-voltbras-criam-rede-com-mais-de-2500-eletropostos-interoperaveis-no-brasil
 
 **Opção A — soluções analisadas**
 
-15. Zaptec — "Zaptec Pro". https://www.zaptec.com/charging-solutions/business-and-commercial/zaptec-pro
-16. Zaptec Docs — "OCPP within Zaptec". https://docs.zaptec.com/docs/ocpp-within-zaptec
-17. ChargePoint — "EV Charging Solutions for Condo Managers and HOAs". https://www.chargepoint.com/solutions/condos
-18. EV Connect — "New ChargePoint Fees: What's Changing and Who Pays More". https://www.evconnect.com/blog/chargepoint-raises-fees-in-2026/
-19. NeoCharge — "Plataforma de Gestão de Recarga". https://www.neocharge.com.br/plataforma-gestao-recarga
-20. NeoCharge — "Carregador para Carro Elétrico em Prédios e Condomínios". https://www.neocharge.com.br/tudo-sobre/carregador-carro-eletrico-predio-condominio-instalacao
-21. Governo do Paraná (AEN) — "Copel coloca em operação seu primeiro eletroposto com carregador ultrarrápido". https://www.parana.pr.gov.br/aen/Noticia/Copel-coloca-em-operacao-seu-primeiro-eletroposto-com-carregador-ultrarrapido
-22. App Store — "Eletroposto Fácil" (Copel). https://apps.apple.com/br/app/eletroposto-f%C3%A1cil/id1610189111
+16. Zaptec — "Zaptec Pro". https://www.zaptec.com/charging-solutions/business-and-commercial/zaptec-pro
+17. Zaptec Docs — "OCPP within Zaptec". https://docs.zaptec.com/docs/ocpp-within-zaptec
+18. ChargePoint — "EV Charging Solutions for Condo Managers and HOAs". https://www.chargepoint.com/solutions/condos
+19. EV Connect — "New ChargePoint Fees: What's Changing and Who Pays More". https://www.evconnect.com/blog/chargepoint-raises-fees-in-2026/
+20. NeoCharge — "Plataforma de Gestão de Recarga". https://www.neocharge.com.br/plataforma-gestao-recarga
+21. NeoCharge — "Carregador para Carro Elétrico em Prédios e Condomínios". https://www.neocharge.com.br/tudo-sobre/carregador-carro-eletrico-predio-condominio-instalacao
+22. Governo do Paraná (AEN) — "Copel coloca em operação seu primeiro eletroposto com carregador ultrarrápido". https://www.parana.pr.gov.br/aen/Noticia/Copel-coloca-em-operacao-seu-primeiro-eletroposto-com-carregador-ultrarrapido
+23. App Store — "Eletroposto Fácil" (Copel). https://apps.apple.com/br/app/eletroposto-f%C3%A1cil/id1610189111
 
 ### Opção C — análise de dados públicos
 
-Todas as fontes abaixo foram acessadas em 2026-06-09. Citações no texto: [ABVE, 2026] = fonte 23; [ABVE, 2026b] = fonte 25; [ABVE, 2022] = fonte 24.
+Todas as fontes abaixo foram acessadas em 2026-06-09. Citações no texto: [ABVE, 2026] = fonte 24; [ABVE, 2026b] = fonte 26; [ABVE, 2022] = fonte 25.
 
-23. ABVE — "Eletrificados crescem dez vezes mais do que o conjunto do mercado, e vendas chegam a 224 mil veículos em 2025" (emplacamentos 2025/2024/2016 e divisão BEV/PHEV/HEV; mesma fonte 1). https://abve.org.br/eletrificados-crescem-dez-vezes-mais-do-que-conjunto-do-mercado-em-2025-com-224-mil-veiculos-vendidos/
-24. ABVE — "Eletrificados batem todas as previsões em 2021" (emplacamentos 2019–2021 e divisão por tecnologia em 2021). https://abve.org.br/eletrificados-batem-todas-as-previsoes-em-2021/
-25. ABVE — "Recarga pública rápida cresce 167% em um ano e chega a 31% dos 21 mil eletropostos da rede" (rede fev/2025 e fev/2026 com divisão AC/DC, municípios por região, frota plug-in de 411.869, razão 19,6 veículos/ponto e referência 10:1). https://abve.org.br/recarga-publica-rapida-cresce-167-em-12-meses-e-ja-atinge-31-dos-21-mil-eletropostos-da-rede/
-26. Fecombustíveis (reprodução de O Globo, 04/01/2024) — "Venda de carros eletrificados no Brasil cresce 91% em 2023 e atinge 93,9 mil emplacamentos" (emplacamentos 2022 e 2023, dados ABVE). https://www.fecombustiveis.org.br/noticia/venda-de-carros-eletrificados-no-brasil-cresce-91-em-2023-e-atinge-939-mil-emplacamentos/255655
-27. ClimaInfo — "Pontos de recarga de VEs crescem 59% no Brasil, mas distribuição é desigual" (rede ago/2025 de 16.880 pontos e frota plug-in de 302.225, dados ABVE/Tupi). https://climainfo.org.br/2025/09/18/pontos-de-recarga-de-ves-crescem-59-no-brasil-mas-distribuicao-e-desigual/
-28. Latam Mobility — "O Brasil alcança 16.880 pontos de recarga públicos e semipúblicos" (divisão AC/DC em 31/08/2025). https://latamobility.com/pt-br/o-brasil-alcanca-16-880-pontos-de-recarga-publicos-e-semipublicos-para-veiculos-eletricos/
-29. AutoIndústria — "A nova geografia da recarga elétrica no Brasil" (SP com 4.777 pontos, 28,3%; SP+RJ+RS+DF com mais da metade da rede). https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
-30. Open Charge Map — espelho oficial `ocm-export` no GitHub (1.298 pontos de recarga no Brasil, georreferenciados; a API oficial exige chave gratuita, o espelho não). https://github.com/openchargemap/ocm-export
-31. IBGE — API de localidades, lista oficial dos 5.571 municípios com UF e região. https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado
+24. ABVE — "Eletrificados crescem dez vezes mais do que o conjunto do mercado, e vendas chegam a 224 mil veículos em 2025" (emplacamentos 2025/2024/2016 e divisão BEV/PHEV/HEV; mesma fonte 1). https://abve.org.br/eletrificados-crescem-dez-vezes-mais-do-que-conjunto-do-mercado-em-2025-com-224-mil-veiculos-vendidos/
+25. ABVE — "Eletrificados batem todas as previsões em 2021" (emplacamentos 2019–2021 e divisão por tecnologia em 2021). https://abve.org.br/eletrificados-batem-todas-as-previsoes-em-2021/
+26. ABVE — "Recarga pública rápida cresce 167% em um ano e chega a 31% dos 21 mil eletropostos da rede" (rede fev/2025 e fev/2026 com divisão AC/DC, municípios por região, frota plug-in de 411.869, razão 19,6 veículos/ponto e referência 10:1). https://abve.org.br/recarga-publica-rapida-cresce-167-em-12-meses-e-ja-atinge-31-dos-21-mil-eletropostos-da-rede/
+27. Fecombustíveis (reprodução de O Globo, 04/01/2024) — "Venda de carros eletrificados no Brasil cresce 91% em 2023 e atinge 93,9 mil emplacamentos" (emplacamentos 2022 e 2023, dados ABVE). https://www.fecombustiveis.org.br/noticia/venda-de-carros-eletrificados-no-brasil-cresce-91-em-2023-e-atinge-939-mil-emplacamentos/255655
+28. ClimaInfo — "Pontos de recarga de VEs crescem 59% no Brasil, mas distribuição é desigual" (rede ago/2025 de 16.880 pontos e frota plug-in de 302.225, dados ABVE/Tupi). https://climainfo.org.br/2025/09/18/pontos-de-recarga-de-ves-crescem-59-no-brasil-mas-distribuicao-e-desigual/
+29. Latam Mobility — "O Brasil alcança 16.880 pontos de recarga públicos e semipúblicos" (divisão AC/DC em 31/08/2025). https://latamobility.com/pt-br/o-brasil-alcanca-16-880-pontos-de-recarga-publicos-e-semipublicos-para-veiculos-eletricos/
+30. AutoIndústria — "A nova geografia da recarga elétrica no Brasil" (SP com 4.777 pontos, 28,3%; SP+RJ+RS+DF com mais da metade da rede). https://www.autoindustria.com.br/2026/02/24/a-nova-geografia-da-recarga-eletrica-no-brasil/
+31. Open Charge Map — espelho oficial `ocm-export` no GitHub (1.298 pontos de recarga no Brasil, georreferenciados; a API oficial exige chave gratuita, o espelho não). https://github.com/openchargemap/ocm-export
+32. IBGE — API de localidades, lista oficial dos 5.571 municípios com UF e região. https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado

@@ -128,7 +128,7 @@ Total estimado: 13–17 dias ativos. A ordem é deliberada: dados antes de tudo 
 
 A equipe usou assistentes de IA (Claude) como ferramenta de pesquisa e redação ao longo de toda a Sprint 1, sob direção e revisão humana. Toda fonte citada neste README e nos dossiês foi efetivamente acessada e verificada — o método de cada seção (texto oficial baixado do site do órgão, chamada real de API com resposta preservada, leitura íntegra de datasheet e manual) está declarado nos blocos "Método" no início das seções dos dossiês, e nenhuma referência entrou nas listas sem acesso confirmado.
 
-As análises, escolhas e conclusões são da equipe: a seleção das opções de aprofundamento em cada frente, a decisão de transformar a indisponibilidade da API SEMS (Opção 2-B) em decisão arquitetural, o modelo híbrido de rateio, o adiamento do clustering por honestidade estatística e a rejeição da interface conversacional no núcleo da solução. Os artefatos de planejamento do processo (especificação de design e plano de execução da sprint) estão em [docs/superpowers/](docs/superpowers/), por transparência sobre como a colaboração entre equipe e IA funcionou na prática.
+As análises, escolhas e conclusões são da equipe: a seleção das opções de aprofundamento em cada frente, a decisão de transformar a indisponibilidade da API SEMS (Opção 2-B) em decisão arquitetural, o modelo híbrido de rateio, o adiamento do clustering por honestidade estatística e a rejeição da interface conversacional no núcleo da solução. Os artefatos de planejamento do processo (especificação de design e plano de execução da sprint) são mantidos pela equipe e podem ser apresentados sob solicitação.
 
 ## Fontes
 

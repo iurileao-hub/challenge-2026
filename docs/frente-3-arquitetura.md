@@ -203,7 +203,7 @@ erDiagram
     CHARGE_POINT |o--o{ ANOMALY_FLAG : "monitora"
 ```
 
-Leitura das cardinalidades não óbvias: `UNIT |o--o{ APP_USER` porque o visitante é usuário sem unidade; `INVOICE` pertence a uma unidade **ou** a um visitante (FKs mutuamente exclusivas); `TELEMETRY_READING` sempre pertence a um ponto, opcionalmente a uma sessão; `ANOMALY_FLAG` referencia sessão (anomalias de consumo/medição) ou ponto (anomalias de saúde), ao menos um dos dois.
+Leitura das cardinalidades não óbvias: `UNIT |o--o{ APP_USER` porque o visitante é usuário sem unidade; `INVOICE` pertence a uma unidade **ou** a um visitante (FKs mutuamente exclusivas); `TELEMETRY_READING` sempre pertence a um ponto, opcionalmente a uma sessão; `ANOMALY_FLAG` referencia sessão (anomalias de consumo/medição) ou ponto (anomalias de saúde), ao menos um dos dois. **Nota:** a PK `id` foi omitida de todas as entidades conforme a convenção declarada na seção "Dicionário de entidades".
 
 ### Dicionário de entidades
 
@@ -327,6 +327,7 @@ Convenções: PK = `id` inteiro autoincremental em toda entidade (omitido das ta
 | `provisional_price_kwh` | DECIMAL(8,4) | Provisória que vigorou na competência |
 | `delta_price_kwh` | DECIMAL(8,4) | Efetiva − provisória (pode ser negativa) |
 | `settled_in_competence` | CHAR(7) | Competência cuja fatura carrega as linhas de ajuste |
+| `created_at` | TIMESTAMPTZ | Data de registro da reconciliação |
 
 **`invoice`** — a fatura mensal (decisão 3):
 
@@ -474,7 +475,7 @@ Os registros abaixo são do mesmo cenário do mês fictício (FKs consistentes e
 
 ### Um mês fictício: junho/2026 no Residencial Jardim Aurora
 
-Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vigência tarifária do JSON acima (provisória R$ 0,7252/kWh, `C_disp` = R$ 180,00 — os mesmos parâmetros da demonstração curta da Opção A, que cobriu uma unidade; aqui o mês inteiro, multi-unidade). Três unidades carregaram: a **72** (Ana e Bruno, casal com **dois veículos** e duas credenciais — caso 3 da Opção A), a **34** (Carla, com a **sessão interrompida** — caso 1) e a **105** (Davi, cuja última sessão **atravessa a virada do mês**). As 10 sessões de junho:
+Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vigência tarifária do JSON acima (provisória R$ 0,7252/kWh, `C_disp` = R$ 180,00 — os mesmos parâmetros da demonstração curta da Opção A, que cobriu uma unidade; aqui o mês inteiro, multi-unidade). Três unidades carregaram: a **72** (Ana e Bruno, casal com **dois veículos** e duas credenciais — caso 3 da Opção A; 3 unidades e 4 usuários no total — Ana e Bruno dividem a 72), a **34** (Carla, com a **sessão interrompida** — caso 1) e a **105** (Davi, cuja última sessão **atravessa a virada do mês**). As 10 sessões de junho:
 
 | # (id) | Início → fim | Unidade / credencial | kWh | Status |
 |---|---|---|---|---|
@@ -526,7 +527,7 @@ A linha da sessão 1006 exercita o half-up de verdade: 8,1585 arredonda para **8
 | 34 | 71,370 × 0,1848 = 13,18918 | R$ 13,19 |
 | 105 | 79,050 × 0,1848 = 14,60844 | R$ 14,61 |
 
-Total de ajustes: R$ 37,54 (contra R$ 37,5366 exatos — erro de arredondamento de menos de 1 centavo por unidade, absorvido pelo caixa conforme a regra de resíduo da Opção A). As 9 aderentes sem consumo em junho não recebem ajuste — Δ multiplica kWh, e o kWh delas é zero.
+Total de ajustes: R$ 37,54 (contra R$ 37,5366 — soma antes do arredondamento final por linha, 4 casas — erro de menos de 1 centavo por unidade, absorvido pelo caixa conforme a regra de resíduo da Opção A). As 9 aderentes sem consumo em junho não recebem ajuste — Δ multiplica kWh, e o kWh delas é zero.
 
 ### Análise da equipe
 

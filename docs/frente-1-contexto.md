@@ -121,9 +121,35 @@ Lendo as quatro soluções em conjunto, o mercado se divide em dois eixos: **exc
 
 ## Opção B — Pesquisa com usuários
 
-*Em andamento.* O roteiro está pronto em [`docs/entrevistas/roteiro.md`](entrevistas/roteiro.md) e as entrevistas estão em aplicação pela equipe; respostas e insights serão incorporados a esta seção antes da entrega.
+**Método.** A equipe aplicou o instrumento do roteiro (perguntas P1–P15 de [`docs/entrevistas/roteiro.md`](entrevistas/roteiro.md)) como **survey estruturado online** (Google Forms), em vez das entrevistas presenciais originalmente previstas, e coletou **12 respostas** entre 10 e 12 de junho de 2026: 7 pessoas com veículo elétrico ou híbrido plug-in, 3 que consideram ter, 1 sem intenção de ter (perspectiva cética deliberadamente incluída) e 1 síndico/administrador de condomínio. É uma **amostra de conveniência auto-selecionada**: os achados têm valor **qualitativo e direcional** — iluminam preferências, prioridades e pontos de atrito reais —, mas não sustentam inferência estatística nem representam o universo de condôminos. Cada respondente é citado como `R1`–`R12`; a síntese abaixo prioriza o que é acionável para o design e não reproduz os dados brutos.
 
-<!-- a preencher: respostas e insights das entrevistas -->
+### O que a pesquisa confirma
+
+**1. "Cada um paga o que consumiu" é a âncora de justiça — 9 dos 12.** Na pergunta sobre o que torna uma divisão justa, a medição individual do consumo domina as respostas. Duas vozes a refinam de forma útil: R5 lembra que justiça também é processo — "as regras terem sido combinadas antes, por todos" — e R8 pede transparência do cálculo, não só do resultado ("poder ver como o valor foi calculado"). *Implicação:* o rateio por kWh medido por sessão, já no núcleo da arquitetura, é exatamente o que a maioria entende por justo — e precisa expor o *como* do cálculo, não só o total.
+
+**2. A fatura que gera confiança é quase um espelho do CRF projetado.** Os itens mais pedidos para confiar no valor coincidem com os campos da fatura especificada na Frente 3: energia em kWh por recarga, data e hora, preço por kWh e sua origem (tarifa da distribuidora), qual app/cartão iniciou a sessão e um caminho fácil de contestação. R6 acrescenta um item barato e não previsto: **comparativo com meses anteriores**. *Implicação:* a fatura está bem dimensionada; vale incorporar o histórico comparativo como elemento de confiança de baixo custo.
+
+**3. Disponibilidade é a maior dor — e o principal motivo de ruptura.** Diante do carregador ocupado, os pedidos se concentram em reservar horário, ver pelo celular quando vai liberar e fila com aviso prévio (R2: "fila de espera com aviso 15 minutos antes"); R4 quer um segundo carregador. Do outro lado, "indisponibilidade quando precisasse usar" (R5) e dificuldade de agendar horário (R9) aparecem como motivos para abandonar o sistema. *Implicação:* pelo lado do usuário, confirma-se o mesmo alerta que a análise da Copel trouxe pelo lado da operação (Opção A) — **monitoramento de disponibilidade e algum mecanismo de reserva/fila merecem tratamento de primeira classe**, não de acessório.
+
+**4. Erro de cobrança corrói a confiança depressa.** Falhas de cobrança surgem espontaneamente como motivo de ruptura (R2: "falha na cobrança"; R12: "erro na cobrança várias vezes"). *Implicação:* confiabilidade e auditabilidade do faturamento são requisito, não diferencial — o que conversa diretamente com a trilha de IA de detecção de anomalias de consumo.
+
+**5. Para iniciar a sessão, o reconhecimento automático do carro é o preferido** — 6 das 11 pessoas que opinaram, à frente de app (3) e cartão/RFID (1). O atrito de "ter de usar um aplicativo para cada empresa de recarga" (R4) reforça a preferência por autoidentificação. *Implicação:* priorizar a autoidentificação da sessão, mantendo app e RFID como alternativas.
+
+**6. A perspectiva de gestão (n=1, mas instrutiva).** O único gestor (R9) já mede consumo individual (relógio + cadastro na distribuidora) e atribui a isso a ausência de conflito: "não houve, pois temos como medir o consumo de cada um". Ele quer cobrança automática junto ao boleto, relatório de consumo por unidade e, para se blindar de contestação, "preço ancorado na tarifa oficial da distribuidora" e "canal formal de contestação". Aprovaria o modelo em assembleia "tranquilamente" — mas observa que "há outras soluções customizadas melhores". *Implicação:* o painel do gestor, a integração com boleto e a ancoragem tarifária não são suposições nossas; ao menos um operador real os pede de forma espontânea. A ressalva ("soluções melhores") lembra que o gestor compara — o diferencial precisa ser explícito para ele.
+
+### Tensões e pontos a considerar
+
+A natureza qualitativa e o N pequeno pedem cautela: o que segue **não nos obriga a rever a avaliação do problema**, mas aponta alternativas e ajustes a ponderar — sempre contra a viabilidade do modelo comercial.
+
+- **Percepção de (in)justiça no modelo "taxa fixa + energia".** Apresentado o modelo, as respostas se dividiram: 5 "justo", 2 "aceitável com ressalvas", 2 "injusto", 2 "não sei". Não há rejeição majoritária, mas a minoria crítica é articulada e consistente — R4 resume: "a injustiça está em quem adere pagar pela manutenção sem desconto no valor da energia". Há ainda um problema de **instrumento**: R10 apontou que a pergunta não deixou claro se quem não adere pode usar o ponto, e leu o modelo como porta para o carona ("se quem não adere não paga, mas usa??"). Parte dos "injusto/não sei" pode ser ruído da redação, não rejeição do modelo. *A considerar:* (a) comunicar a contrapartida da taxa fixa conectando-a justamente ao que a pesquisa apontou como maior valor — disponibilidade e manutenção garantidas ("a taxa mantém o carregador sempre de pé e funcionando"); (b) explicitar a regra de acesso de não aderentes; (c) avaliar, como alternativa de oferta para quem rejeita o fixo, um modelo sem taxa mensal com a margem embutida no kWh — sem abandonar o fixo, que é o que sustenta o serviço comercialmente.
+
+- **Tolerância a sobretaxa é estreita.** Entre quem deu um número, a disposição a pagar acima da energia de casa concentra-se em 10–25%; dois respondentes só topam "o custo exato da energia" (R2, R8) e apenas um pagaria "preço de eletroposto" (R7). *A considerar:* manter a taxa fixa enxuta e o preço por kWh ancorado na tarifa oficial — o mesmo que o gestor R9 pede para se proteger de contestação —, tratando margem alta como risco de adesão.
+
+- **Simplicidade × exatidão.** R12 prefere "simplicidade, mesmo que o valor seja aproximado". É voz minoritária — a maioria quer exatidão —, mas lembra que a fatura precisa ser ao mesmo tempo precisa *e* legível: precisão que ninguém entende não gera confiança.
+
+### Síntese
+
+A pesquisa **confirma** os pilares do EV ChargeOps — rateio por consumo medido, fatura transparente e auditável, disponibilidade como prioridade e painel do gestor —, em vários casos com as palavras dos próprios respondentes. As **tensões** se concentram não no *quê*, mas no *como comunicar e precificar*: a contrapartida da taxa fixa precisa ser tornada explícita (e ela é, convenientemente, o atributo mais valorizado — disponibilidade), a regra para não aderentes precisa ser clara e a margem precisa caber na estreita tolerância a sobretaxa. São ajustes de produto e de mensagem, **compatíveis com — e não opostos a — a sustentação comercial do serviço**.
 
 ## Opção C — Análise de dados públicos
 

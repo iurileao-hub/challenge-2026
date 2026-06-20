@@ -27,3 +27,9 @@ Evidência das chamadas reais documentadas na seção "Opção C — APIs comple
 | `aneel_datastore_enelsp_b3.json` | **Sim** | `datastore_search` filtrado (ELETROPAULO / B3 / Tarifa de Aplicação / Convencional), com a tarifa vigente da Enel SP | curl da seção |
 
 Os dados da ABVE/Tupi Mobilidade (emplacamentos anuais, rede de recarga, frota plug-in) **não têm dataset estruturado público** — foram transcritos manualmente de releases e estão como dicionários comentados no próprio notebook, com URL e data de acesso por número.
+
+## Dados da pesquisa com usuários (Frente 1-B)
+
+| Arquivo | No repo? | Conteúdo | Origem |
+|---|---|---|---|
+| `pesquisa_challenge.csv` | **Não** (contém dado pessoal) | 12 respostas do survey estruturado sobre o instrumento P1–P15 do [roteiro](../docs/entrevistas/roteiro.md), aplicado via Google Forms entre 10 e 12/06/2026 | Exportação do Google Forms. Mantido **fora do repositório** porque um respondente deixou contato pessoal num campo opcional (LGPD) — excluído por `data/*` no `.gitignore`. Os insights curados e anonimizados (`R1`–`R12`) estão em [`docs/frente-1-contexto.md`](../docs/frente-1-contexto.md), seção "Opção B"; a planilha bruta fica disponível sob solicitação à equipe |

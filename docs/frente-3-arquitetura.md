@@ -18,7 +18,7 @@ O HCA G2 conversa com o mundo por **LAN (RJ45) ou Wi-Fi** até o roteador da gar
 2. **Gerador sintético** — produz sessões e telemetria diretamente no esquema da Opção C, calibrado no dataset público (Opção B, seção de cold start).
 3. **Dataset Kaggle** — as 3.395 sessões reais de Asensio et al., mapeadas campo a campo no contrato (Opção B).
 
-Trocar de fonte é trocar de adaptador, não refatorar — a aposta verificável já declarada na Opção B. O **adaptador Modbus TCP local** fica registrado como candidato a caminho real de telemetria numa instalação própria (Frente 2, Análise da equipe). O desenho responde ao art. 552 da REN 1.000 (protocolos abertos para comunicação e supervisão) por espírito, não só por letra: o modelo interno nasce aberto e portável para qualquer carregador OCPP futuro.
+Trocar de fonte é trocar de adaptador, não refatorar. O **adaptador Modbus TCP local** fica registrado como candidato a caminho real de telemetria numa instalação própria (Frente 2, Análise da equipe). O desenho responde ao art. 552 da REN 1.000 (protocolos abertos para comunicação e supervisão) por espírito, não só por letra: o modelo interno nasce aberto e portável para qualquer carregador OCPP futuro.
 
 ### Camada de aplicação — back-end, regras de negócio e IA
 

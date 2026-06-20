@@ -4,6 +4,14 @@ Sprint 1 do Enterprise Challenge 2026: pesquisa e documentação do **EV ChargeO
 
 Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um dossiê completo em `docs/`, com método declarado, fontes verificadas e análise própria — aqui apresentamos as conclusões e decisões; o detalhe, a evidência e a justificativa estendida estão nos dossiês linkados.
 
+## TL;DR
+
+- **Problema:** a frota plug-in cresce ~2× mais rápido que a rede pública de recarga (a razão veículos/ponto público piorou de 17,9 para 19,6 em um ano) e a recarga recai na garagem compartilhada — que chega a esse papel sem camada de gestão: rateio injusto, limite de potência e disputa por carregador.
+- **Tese:** o gargalo não é o hardware (carregador AC é commodity), é a **gestão**.
+- **Solução — EV ChargeOps:** sessão identificada por usuário + rateio por kWh medido, justo e auditável + IA operacional (previsão de pico, detecção de anomalia, simulação tarifária) sobre a telemetria, neutra de hardware via OCPP.
+- **Diferencial:** das cinco soluções de mercado analisadas, nenhuma oferece ao mesmo tempo rateio condominial nativo do Brasil, neutralidade de hardware (OCPP) e IA operacional — essa interseção vazia é o posicionamento.
+- **Entregue nesta Sprint 1:** três dossiês com fontes primárias verificadas, notebook de análise reproduzível, esquema de dados de 14 entidades e motor de rateio testado num mês fictício; a restrição real (sem acesso à API da GoodWe) foi convertida em decisão de arquitetura — ingestão plugável + tripé de dados.
+
 ## Equipe
 
 **Equipe GoodNóis**
@@ -77,7 +85,7 @@ A GoodWe comunicou que **não disponibilizará acesso à API SEMS** para as equi
 2. **Dataset público real** — as 3.395 sessões reais de recarga de Asensio et al. (2021), publicadas na Scientific Data e reempacotadas no Kaggle (o dataset sugerido pelo enunciado), mapeadas campo a campo no nosso esquema; é a base empírica que impede que as distribuições dos nossos dados sejam invenção.
 3. **Gerador de dados sintéticos** — produz sessões e telemetria diretamente no esquema da Frente 3-C, calibrado nas distribuições do dataset real (com o eixo horário espelhado do padrão diurno de trabalho para o noturno de condomínio) e capaz de injetar anomalias com gabarito conhecido, o que torna a detecção avaliável com métrica objetiva.
 
-Honestidade declarada: **nenhum evento real de um HCA G2 atravessou este pipeline até aqui.** Dado real do carregador do campus só será possível na visita ao Energy Innovation Lab, na Sprint 2, se viável — e o desenho inteiro aposta que, quando ele chegar, entra pelo mesmo gateway sem mover nenhuma outra caixa da arquitetura. Essa aposta é verificável e será cobrada.
+Honestidade declarada: **nenhum evento real de um HCA G2 atravessou este pipeline até aqui.** Dado real do carregador do campus só será possível na visita ao Energy Innovation Lab, na Sprint 2, se viável; a arquitetura foi desenhada para absorvê-lo pela camada de ingestão, sem alteração estrutural (justificativa técnica na Frente 3).
 
 ## Modelo de rateio
 

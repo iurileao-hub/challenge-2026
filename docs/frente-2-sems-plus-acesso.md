@@ -65,7 +65,7 @@ Todos sob `https://us-gateway.semsportal.com`, capturados ao abrir a planta e a 
 - **Menu lateral da plataforma:** Lista de plantas · Lista dispositivos · Central de Alarmes · Central de relatórios · Analisar · Centro de serviço · Organização e Gestão.
 - **Central de relatórios:** apenas "Relatório da estação" (Estatístico / Operacional) e "Relatório do inversor" — **nenhum relatório de carregador EV**; escopo por organização (a planta compartilhada da FIAP não aparece como ativo selecionável).
 
-**Nota sobre a autonomia.** O valor "≈ Autonomia" é **derivado por fator fixo de 5,0 km/kWh** (29,80 ÷ 5,96 = 5,0; 73,00 ÷ 14,60 = 5,0; idem em todas as sessões) — é estimativa de UI, não telemetria de consumo do veículo.
+**Nota sobre a autonomia.** O valor "≈ Autonomia" é **derivado por fator fixo de ≈ 5,0 km/kWh** (29,80 ÷ 5,96 = 5,00; 73,00 ÷ 14,60 = 5,00; idem em todas as sessões) — é estimativa de UI, não telemetria de consumo do veículo. Pequenas divergências de centésimo (ex.: a sessão #18 exibe 71,44 km, e não 71,45 = 14,29 × 5) são arredondamento de exibição sobre um kWh interno mais preciso que o mostrado.
 
 ## Histórico de sessões encerradas (`queryChargeLogList`)
 

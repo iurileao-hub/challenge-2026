@@ -68,9 +68,9 @@ Nos três documentos oficiais consultados na íntegra (datasheet PT, datasheet E
 
 O HCA G2 é um carregador *solar-first* de nicho residencial, não um produto de recarga comercial multiusuário — e isso tem três consequências para o projeto. **Primeira:** a atribuição de sessão a usuário é viável com o que o equipamento já tem (RFID na partida + 2 cartões de fábrica + cartões adicionais), mas a inteligência de "quem é o dono do cartão" é toda nossa — o carregador autentica o cartão, a plataforma autentica a pessoa. **Segunda:** a ausência de OCPP nativo documentado conversa diretamente com o art. 552 da REN 1.000 (equipamento de uso não exclusivamente privado deve ser compatível com *"protocolos abertos de domínio público"* para comunicação e supervisão/controle remotos — discutido na Opção A): Modbus TCP é um protocolo aberto de especificação pública, o que dá um argumento de conformidade literal, mas é um protocolo de telemetria de equipamento, não de gestão de recarga (não modela sessão, usuário, autorização, tarifa). A leitura da equipe é que a arquitetura correta é um **gateway de ingestão que traduza o que o HCA G2 oferece (Modbus TCP local e/ou nuvem SEMS) para o modelo de dados OCPP internamente** — conformidade de espírito, não só de letra, e portabilidade para qualquer carregador aberto no futuro. **Terceira:** o RS-485 com medidor MID é a resposta do próprio fabricante à pergunta "que kWh vale para cobrança?" — num rateio condominial contestável em assembleia, medição certificada vale mais que número de API; o desenho da Sprint 2 deve manter o campo "fonte da medição" no esquema de dados desde o primeiro dia.
 
-## API GoodWe SEMS Portal (documentação pública)
+## API GoodWe SEMS Portal e plataforma SEMS+
 
-> **Método e restrição central.** A GoodWe informou que **não disponibilizará acesso à API SEMS para as equipes do desafio**, por limitação técnica do lado dela. Esta seção é, portanto, um levantamento **exclusivamente documental**: nenhum endpoint foi chamado, nem mesmo o de login. O objetivo muda de "integrar" para "especificar": o que se documenta aqui é o **contrato de dados que a camada de ingestão plugável da arquitetura (Frente 3) espelha** — e que a Sprint 2 alimentará com **dados sintéticos + dataset público (Kaggle) no mesmo esquema**, de modo que uma integração real futura seja um adaptador a plugar, não uma refatoração. Cada afirmação abaixo carrega seu nível de confiabilidade: **[A]** documentação oficial GoodWe; **[B]** código-fonte de integrações open-source amplamente usadas (engenharia reversa estável, mas não contratual); **[C]** documentação de terceiros.
+> **Método e níveis de evidência.** Sob o nome "API SEMS" convivem duas coisas distintas, e esta seção as separa. **(1) A OpenAPI oficial de desenvolvedor** (credenciada, B2B): a GoodWe informou que **não a disponibilizará às equipes do desafio**, por limitação técnica do lado dela — sobre ela o levantamento permanece **exclusivamente documental** (nenhum endpoint credenciado foi chamado). **(2) A plataforma de monitoramento SEMS+** (`semsplus.goodwe.com`): em **26/06/2026 a GoodWe concedeu à conta da equipe acesso de monitoramento à planta real do Energy Innovation Lab da FIAP** — "LAB FIAP Eco Smart Home", com o carregador HCA G2 de número de série `57000HPA247L0002` — e a equipe **explorou a interface web diretamente**, capturando no painel de rede do navegador o contrato da **API privada que o próprio front-end web do SEMS+ consome**. O objetivo do levantamento se mantém: especificar o **contrato de dados que a camada de ingestão plugável da arquitetura (Frente 3) espelha** — alimentada na Sprint 2 por **dados sintéticos + dataset público no mesmo esquema** —, de modo que uma integração real futura seja um adaptador a plugar, não uma refatoração. Cada afirmação abaixo carrega seu nível de confiabilidade: **[A]** documentação oficial GoodWe; **[B]** código-fonte de integrações open-source amplamente usadas (engenharia reversa estável, mas não contratual); **[C]** documentação de terceiros; **[O]** **observado em primeira mão pela equipe** na plataforma SEMS+ (sessão de 26/06/2026; inventário de endpoints e histórico de sessões preservados em [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md)).
 
 ### O que a documentação oficial diz [A]
 
@@ -98,7 +98,48 @@ Na ausência de documentação oficial, a melhor fonte é código aberto que fun
 | `/api/v3/EvCharger/Charging` | Comando iniciar/parar | Corpo `{"sn", "status"}` |
 | `/api/v3/EvCharger/SetChargeMode` | Modo e potência | Corpo `{"sn", "type", "charge_power"}` — modos Fast / PV priority / PV+battery, limite de potência |
 
-Três características desse contrato merecem registro. (i) O header de login identifica o cliente como `semsPlusAndroid` — ou seja, a comunidade está usando a **API privada do aplicativo SEMS+**, não nenhuma das três modalidades oficiais da tabela anterior; pode mudar sem aviso, como a própria convivência v3/v4 com fallback sugere. (ii) O envelope de resposta é JSON com `msg` + `data`, e a expiração de token é sinalizada por mensagem, não por código HTTP — idiossincrasia que um adaptador real precisaria tratar. (iii) **O que não está documentado em lugar nenhum (lacuna):** histórico de sessões encerradas, eventos de início/fim de sessão e — crítico para o EV ChargeOps — **a identificação de qual cartão RFID iniciou a carga**. Os campos observados descrevem a carga *corrente*; se a API do app expõe sessões por usuário, nenhuma fonte pública consultada mostra como.
+Três características desse contrato merecem registro. (i) O header de login identifica o cliente como `semsPlusAndroid` — ou seja, a comunidade está usando a **API privada do aplicativo SEMS+**, não nenhuma das três modalidades oficiais da tabela anterior; pode mudar sem aviso, como a própria convivência v3/v4 com fallback sugere. (ii) O envelope de resposta é JSON com `msg` + `data`, e a expiração de token é sinalizada por mensagem, não por código HTTP — idiossincrasia que um adaptador real precisaria tratar. (iii) **O que não está documentado em lugar nenhum (lacuna):** histórico de sessões encerradas, eventos de início/fim de sessão e — crítico para o EV ChargeOps — **a identificação de qual cartão RFID iniciou a carga**. Os campos observados descrevem a carga *corrente*; se a API do app expõe sessões por usuário, nenhuma fonte pública consultada mostra como. (Essas duas lacunas são reavaliadas na subseção seguinte, a partir do acesso direto da equipe à plataforma web — nível [O].)
+
+### O contrato observado pela equipe na plataforma SEMS+ [O]
+
+Com o acesso concedido em 26/06/2026 (ver Método), a equipe navegou a planta real e capturou, no painel de rede do navegador, as chamadas que o front-end web do SEMS+ faz ao backend. **Dois enquadramentos primeiro:** (i) este é um contrato **diferente** do observado pela comunidade na subseção anterior — não é a API privada do app Android (`semsPlusAndroid`, `/api/v3/EvCharger/...`), e sim a **API web** servida pelo gateway regional `us-gateway.semsportal.com`, organizada em microsserviços (`sems-plant`, `sems-remote`, `sems-alarm`, `sems-user`) e versionada em `v1`/`v2`; (ii) a planta é do tipo residencial ("Eco Smart Home", a maquete do laboratório), não um condomínio — a evidência vale como **forma do dado** (que campos existem e como se organizam), não como amostra de operação condominial real.
+
+Endpoints de carregador efetivamente observados (todos em `https://us-gateway.semsportal.com`, resposta HTTP 200; `{SN}` = `57000HPA247L0002`, `{pwId}` = `stationId` da planta = `7f9af1fc-3a9a-4779-a4c0-ca6ec87bd93a`):
+
+| Endpoint web (método) | Função observada |
+|---|---|
+| `POST /web/sems/sems-plant/api/v1/chargePile/queryChargeLogList` | **Histórico de sessões encerradas** (lista por intervalo de datas) |
+| `GET /web/sems/sems-plant/api/v1/chargePile/getLastCharge?chargeSn={SN}&pwId={pwId}` | Resumo da última sessão de recarga |
+| `POST /web/sems/sems-remote/api/ev-charger/detail` | Estado atual do carregador (ocioso / conectado) |
+| `GET /web/sems/sems-plant/api/equipments/{SN}/information?deviceType=EV_CHARGER&pwId={pwId}` | Identificação do equipamento (modelo, firmware, SN) |
+| `GET /web/sems/sems-plant/api/equipments/{SN}/telecounting?deviceType=EV_CHARGER&pwId={pwId}` | Contadores acumulados (telemetria totalizada) |
+| `POST /web/sems/sems-plant/api/portal/equipments/{SN}/timeSeriesData` | Séries temporais das curvas do dia (kW e kWh) |
+| `GET /web/sems/sems-remote/api/v2/address/remote/get-work-mode?sn={SN}` | **Leitura** do modo de carga (Fast / prioridade solar / …) |
+| `GET /web/sems/sems-remote/api/ev-charger/control-item-content-list/{SN}` | Itens de controle remoto disponíveis |
+| `GET /web/sems/sems-plant/api/web/device/station/getDevicesByType?stationId={pwId}&deviceType=EV_CHARGER` | Lista de carregadores da planta |
+
+(Inventário completo, incluindo os endpoints de planta/alarme/usuário não específicos de recarga, no anexo [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md).)
+
+**O que a interface expõe por sessão** (tela "Registo de carregamento" → `queryChargeLogList`; "Última carga" → `getLastCharge`), com os rótulos exatos da UI em português:
+
+| Campo na UI | Exemplo observado | Relação com as lacunas do doc |
+|---|---|---|
+| Duração | `3Horas 6Minuto` | — |
+| Intervalo início–fim | `25/06/2026 20:53:03 – 25/06/2026 23:58:51` | **Fecha** a lacuna "sessões encerradas / início-fim" |
+| `Energia de carga` (kWh) | `5,96 kWh` | corresponde a `chargeEnergy` / `energy_kwh` |
+| `≈ Autonomia` (km) | `29,80 quilômetro` | valor **derivado** — fator fixo de 5,0 km/kWh, não medição |
+| `ID do cartão` | `57000HPA247L0002` (= o próprio SN) | **Fecha com ressalva** a lacuna RFID (ver abaixo) |
+| `porta de carregamento` | `1` | identifica a saída física do carregador |
+
+**As duas lacunas críticas do levantamento [B], reavaliadas à luz da observação direta:**
+
+1. **Histórico de sessões encerradas com início/fim — existe.** O endpoint `queryChargeLogList` devolve a lista de sessões fechadas com timestamps de início e término; a equipe extraiu **18 sessões** entre 31/05 e 25/06/2026 (tabela íntegra no anexo). A derivação por amostragem de `workstate` que o doc previa como necessária **torna-se desnecessária** no caminho web.
+2. **Identificação RFID — o campo existe, mas estava "cego".** Toda sessão traz um campo `ID do cartão`; nas 18 sessões observadas, porém, ele repete o **número de série do próprio carregador** — assinatura de **partida automática (sem aproximar cartão)**. Leitura da equipe: confirma-se que o *campo* de atribuição é do fabricante, mas o *vínculo cartão→pessoa* (e mesmo o uso efetivo de RFID em vez de auto-start) **continua sendo responsabilidade da plataforma** — exatamente o espaço onde o EV ChargeOps existe. Sem uma sessão iniciada por cartão real, não foi possível confirmar se o campo carregaria o UID do cartão: fica como verificação para a visita ao laboratório.
+
+Mais dois achados da observação direta:
+
+- **A origem da energia já vem separada.** A aba "Monitoramento de carga" do dispositivo distingue, no kWh diário, **"Carregamento de energia verde"** (solar) de **"Carregamento de rede"** — o ecossistema já modela a procedência da energia, dado que conversa diretamente com o campo `measurement_source` do esquema e com o desenho solar-first do HCA G2.
+- **Não há exportação estruturada de recarga.** A "Central de relatórios" do SEMS+ oferece apenas **"Relatório da estação"** (geração / demonstrações de resultados) e **"Relatório do inversor"** — **nenhum relatório de carregador EV**. Confirma-se, agora por observação direta, o "achado central" antes apoiado só na documentação oficial: a recarga é cidadã de segunda classe no SEMS, e os dados de sessão só são acessíveis pela tela / endpoint `chargePile`, não por um export nativo. (A Central é, ainda, escopada à organização da equipe; a planta da FIAP é *compartilhada*, e por isso nem o relatório solar dela é gerável ali.)
 
 ### O esquema que a ingestão plugável espelha
 
@@ -107,16 +148,16 @@ Do levantamento acima, o contrato mínimo de sessão que a camada de ingestão d
 | Campo | Tipo | Origem no SEMS observado | Origem na Sprint 2 |
 |---|---|---|---|
 | `charge_point_id` | texto (nº de série) | `sn` | gerador sintético / mapeamento do dataset |
-| `session_start` / `session_end` | timestamp | **não exposto** — teria de ser derivado por amostragem de `workstate` | gerado diretamente |
+| `session_start` / `session_end` | timestamp | **exposto na API web [O]** (`queryChargeLogList` / `getLastCharge`, com início e fim); na API do app [B] não há — seria derivado por amostragem de `workstate` | gerado diretamente |
 | `energy_kwh` | decimal | `chargeEnergy` | gerado / coluna do dataset |
 | `power_kw` | decimal (série temporal) | `power` (amostrado por polling) | curva sintética |
 | `state` | enum (desconectado/conectado/carregando/concluído/offline) | `workstate` + `status` | gerado |
-| `auth_id` (cartão RFID/usuário) | texto | **não exposto publicamente** | gerado — é a chave do rateio |
+| `auth_id` (cartão RFID/usuário) | texto | **campo `ID do cartão` exposto na API web [O]**; nas sessões observadas, em auto-start, cai no SN do equipamento (uso de cartão real não confirmado) | gerado — é a chave do rateio |
 | `measurement_source` | enum (nuvem/Modbus local/medidor MID) | implícito (nuvem) | declarado pelo gerador |
 
 ### Análise da equipe
 
-A restrição de acesso à API — que poderia parecer um golpe no projeto — é, bem lida, uma **decisão arquitetural tomada pela realidade**. Primeiro, porque o levantamento mostra que mesmo com acesso o contrato seria frágil: API privada de aplicativo, sem documentação oficial para carregadores, com versões convivendo (v3/v4) e sem os dois dados de que o rateio mais precisa (sessões encerradas e identidade RFID). Ancorar a plataforma nela seria construir sobre areia. Segundo, porque a resposta de engenharia — **camada de ingestão plugável que espelha o contrato documentado, alimentada na Sprint 2 por dados sintéticos e dataset público com o mesmo esquema** — não é um remendo: é o mesmo desenho que o art. 552 da REN 1.000 induz (protocolos abertos para comunicação e supervisão, discutido na Opção A) e que a ausência de OCPP nativo do HCA G2 já recomendava. O adaptador SEMS fica especificado e adiável; o adaptador Modbus TCP local vira candidato a caminho real de telemetria numa instalação própria; e o modelo de dados interno nasce OCPP-compatível, pronto para qualquer carregador aberto. Terceiro, porque a lacuna de atribuição RFID na API confirma que **a associação sessão → usuário é o coração do produto, não uma feature do fabricante**: nenhum componente do ecossistema GoodWe resolve isso hoje — é exatamente o espaço onde o EV ChargeOps existe. O risco residual que registramos honestamente: sem nenhum acesso real, nossa especificação do contrato SEMS pode conter erros que só uma chamada autenticada revelaria; mitigamos mantendo o adaptador isolado atrás de interface e tratando os campos da tabela como hipótese documentada, com fonte e nível de confiabilidade, revisável sem custo estrutural.
+A restrição de acesso à API — que poderia parecer um golpe no projeto — é, bem lida, uma **decisão arquitetural tomada pela realidade**. Primeiro, porque o levantamento — agora com acesso real à plataforma web — mostra que o contrato é frágil **mesmo expondo os dados certos**: é uma **API privada não-contratual** (a do app na fonte [B], a da web no acesso [O]), sem documentação oficial para carregadores e com versões convivendo (v3/v4 no app, v1/v2 na web). A observação direta refinou o diagnóstico: as sessões encerradas e o campo de cartão **existem** na API web — fechando as lacunas que o levantamento [B] não enxergava —, mas o RFID chegou em auto-start (sem vínculo a pessoa) e **não há exportação estruturada de recarga**. Ancorar a plataforma num contrato privado que pode mudar sem aviso seria construir sobre areia. Segundo, porque a resposta de engenharia — **camada de ingestão plugável que espelha o contrato documentado, alimentada na Sprint 2 por dados sintéticos e dataset público com o mesmo esquema** — não é um remendo: é o mesmo desenho que o art. 552 da REN 1.000 induz (protocolos abertos para comunicação e supervisão, discutido na Opção A) e que a ausência de OCPP nativo do HCA G2 já recomendava. O adaptador SEMS fica especificado e adiável; o adaptador Modbus TCP local vira candidato a caminho real de telemetria numa instalação própria; e o modelo de dados interno nasce OCPP-compatível, pronto para qualquer carregador aberto. Terceiro, porque o campo de cartão **existir** na API mas chegar **"cego"** (auto-start, preenchido com o SN do equipamento, sem vínculo a pessoa) confirma que **a associação sessão → usuário é o coração do produto, não uma feature do fabricante**: nenhum componente do ecossistema GoodWe resolve isso hoje — é exatamente o espaço onde o EV ChargeOps existe. O risco residual que registramos honestamente: a observação [O] foi feita pela **interface web e pelo painel de rede** (URLs, métodos e os campos renderizados na tela), não pela inspeção dos corpos de resposta JSON — e numa planta **residencial de demonstração**, não num condomínio em operação; soma-se a isso o fato de o contrato web privado poder mudar sem aviso. Mitigamos mantendo o adaptador isolado atrás de interface e tratando os campos da tabela como hipótese documentada, com fonte e nível de confiabilidade, revisável sem custo estrutural.
 
 ## Opção A — Mapeamento regulatório completo
 
@@ -336,6 +377,10 @@ Código aberto da comunidade (nível [B] — engenharia reversa em uso real, nã
 Documentação de terceiros (nível [C] — usada apenas para o rito de credenciamento; acesso em 2026-06-09):
 
 9. Solytic — *Set up API access – GoodWe SEMS API* (pedido via representante, NDA, habilitação na conta SEMS). https://solytic.com/knowledge/set-up-api-access-goodwe-sems-api/
+
+Acesso direto à plataforma (nível [O] — observação de primeira mão da equipe):
+
+10. GoodWe — plataforma de monitoramento **SEMS+** (`https://semsplus.goodwe.com`). Acesso de monitoramento à planta real "LAB FIAP Eco Smart Home" (Energy Innovation Lab da FIAP), carregador HCA G2 SN `57000HPA247L0002`, concedido à conta da equipe em 26/06/2026. Endpoints capturados no painel de rede do navegador e histórico de sessões preservados em [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md).
 
 ### Frente 2 — Opção A (e seção REN 1.000/2021)
 

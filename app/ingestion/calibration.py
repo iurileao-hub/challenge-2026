@@ -56,6 +56,21 @@ SOURCE = {
     "license": "CC0 1.0",
 }
 
+#: Perfil semanal RESIDENCIAL -- premissa declarada da equipe, NAO derivada.
+#:
+#: Este e o limite do dataset, e preferimos marcar a fronteira a disfarca-la. O
+#: eixo horario pode ser realinhado porque o evento subjacente ("cheguei e
+#: pluguei") existe nos dois contextos. O ciclo SEMANAL nao: no local de
+#: trabalho a demanda e de segunda a sexta e desaba no fim de semana; num
+#: condominio, o morador esta em casa justamente sabado e domingo. O dataset
+#: nao tem como informar o padrao residencial -- ele nunca observou um.
+#:
+#: Entao assumimos, e dizemos que assumimos: demanda praticamente uniforme ao
+#: longo da semana, com leve elevacao no fim de semana (mais tempo em casa, mais
+#: deslocamentos de lazer para repor). Os pesos do workplace continuam gravados
+#: no JSON, para quem quiser comparar ou contestar a premissa.
+RESIDENTIAL_WEEKDAY_PROFILE = [0.135, 0.135, 0.135, 0.135, 0.145, 0.16, 0.155]
+
 #: Deslocamento do eixo horario: workplace diurno -> condominio noturno.
 #:
 #: A estrategia de dados da Sprint 1 pedia o eixo "espelhado". Ao derivar os
@@ -87,12 +102,16 @@ class CalibrationParams:
     hour_weights: list[float]
     sessions_per_user_month_mean: float
     sessions_per_user_month_sd: float
-    weekday_weights: list[float]
+    weekday_weights: list[float]              # derivado do workplace (referencia)
+    residential_weekday_weights: list[float]  # premissa da equipe, usada na geracao
     hour_shift: int = HOUR_SHIFT
     source: dict = field(default_factory=lambda: dict(SOURCE))
     note: str = (
         "Energia NAO e calibrada neste dataset (potencia media implicita de "
-        "2,13 kW contra 7 kW do HCA G2): e derivada por fisica no gerador."
+        "2,13 kW contra 7 kW do HCA G2): e derivada por fisica no gerador. "
+        "weekday_weights e o padrao OBSERVADO no workplace, guardado por "
+        "transparencia; a geracao usa residential_weekday_weights, que e "
+        "PREMISSA declarada da equipe -- o dataset nunca observou um condominio."
     )
 
     def save(self, path: Path = PARAMS_PATH) -> Path:
@@ -150,6 +169,7 @@ def derive(dataset_path: Path = DATASET_PATH) -> CalibrationParams:
         sessions_per_user_month_mean=float(per_user_month.mean()),
         sessions_per_user_month_sd=float(per_user_month.std(ddof=1)),
         weekday_weights=weekday_weights,
+        residential_weekday_weights=list(RESIDENTIAL_WEEKDAY_PROFILE),
         hour_shift=HOUR_SHIFT,
     )
 

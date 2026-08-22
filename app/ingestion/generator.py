@@ -45,7 +45,10 @@ METER_INTERVAL = timedelta(minutes=15)
 #: Intervalo entre heartbeats do ponto fora de sessao.
 HEARTBEAT_INTERVAL = timedelta(hours=1)
 
-ANOMALY_KINDS = ("consumption", "idle", "power_degradation", "metering", "health")
+#: Anomalias injetaveis EM SESSAO. `health` nao esta aqui de proposito: saude do
+#: ponto nao pertence a sessao nenhuma (um ponto morto nao gera sessao para
+#: reclamar por ele) e e injetada na geracao de heartbeats.
+ANOMALY_KINDS = ("consumption", "idle", "power_degradation", "metering")
 
 
 @dataclass
@@ -194,8 +197,21 @@ class SyntheticGenerator:
         return out
 
     def _random_moment(self, start: date, end: date) -> datetime:
+        """Sorteia o instante da sessao.
+
+        O dia e ponderado pelo perfil semanal RESIDENCIAL -- premissa declarada
+        da equipe, nao derivada do workplace (ver `calibration.py`). Usar o peso
+        do dataset original zerava sabado e domingo, que e verdade para um
+        escritorio e falso para um predio.
+
+        A ponderacao importa: com dia uniforme o historico nao teria
+        sazonalidade alguma, e um modelo de previsao treinado nele estaria
+        aprendendo ruido -- foi o que o backtest acusou na primeira rodada.
+        """
         span = (end - start).days
-        day = start + timedelta(days=int(self.rng.integers(0, max(span, 1) + 1)))
+        candidates = [start + timedelta(days=i) for i in range(max(span, 1) + 1)]
+        w = np.array([self.params.residential_weekday_weights[d.weekday()] for d in candidates], dtype=float)
+        day = candidates[int(self.rng.choice(len(candidates), p=w / w.sum()))]
         hour = self._sample_hour()
         minute = int(self.rng.integers(0, 60))
         return datetime.combine(day, time(hour, minute), tzinfo=self.tz)
@@ -216,17 +232,27 @@ class SyntheticGenerator:
         demand, capacity = self._battery_demand(cred)
 
         degraded_from = None
+        force_idle_hours = None
         if anomaly == "idle":
-            # Carro-tampao: fica plugado muito depois de terminar.
-            plugged_hours = min(plugged_hours * float(self.rng.uniform(2.5, 4.0)), 20.0)
+            # Carro-tampao. O tempo ocioso e fixado DEPOIS de saber quanto tempo
+            # a recarga leva -- multiplicar o tempo plugado nao bastava, porque
+            # a energia demandada crescia junto e a ociosidade nao aparecia.
+            force_idle_hours = float(self.rng.uniform(5.0, 11.0))
         elif anomaly == "power_degradation":
             degraded_from = 0.45  # a partir de 45% da sessao a potencia despenca
-        elif anomaly == "consumption":
+        force_energy = None
+        if anomaly == "consumption":
             # Energia acima do que a bateria comporta -- fisicamente impossivel,
             # portanto medicao ou desvio, nunca recarga legitima.
-            demand = capacity * float(self.rng.uniform(1.15, 1.45))
+            #
+            # Aplicada na energia FINAL, e nao na demanda: aumentar a demanda so
+            # fazia o `min(demanda, potencia x tempo)` truncar a anomalia de
+            # volta ao normal. O gabarito acusou isso com recall zero.
+            force_energy = capacity * float(self.rng.uniform(1.15, 1.45))
 
         charging_hours = min(demand / power, plugged_hours)
+        if force_idle_hours is not None:
+            plugged_hours = min(charging_hours + force_idle_hours, 22.0)
         if degraded_from:
             full = charging_hours * degraded_from
             rest = (charging_hours - full) * 2.2   # leva mais tempo pela queda
@@ -235,6 +261,8 @@ class SyntheticGenerator:
         else:
             energy = charging_hours * power
 
+        if force_energy is not None:
+            energy = force_energy
         energy_dec = round3(Decimal(str(max(energy, 0.05))))
         meter_start = meters[point.id]
         meter_stop = meter_start + energy_dec
@@ -275,7 +303,7 @@ class SyntheticGenerator:
         )
 
         truth = None
-        if anomaly and anomaly != "health":
+        if anomaly:
             truth = GroundTruth(
                 session_id=session.id,
                 charge_point_id=None,
@@ -286,13 +314,6 @@ class SyntheticGenerator:
                     "power_degradation": "potencia cai a 35% no meio da sessao",
                     "metering": "leitura final do medidor perdida",
                 }[anomaly],
-            )
-        elif anomaly == "health":
-            truth = GroundTruth(
-                session_id=None,
-                charge_point_id=point.id,
-                category="health",
-                detail="janela sem heartbeat apos a sessao",
             )
         return session, readings, truth
 

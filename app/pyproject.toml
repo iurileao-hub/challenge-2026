@@ -25,3 +25,6 @@ DJANGO_SETTINGS_MODULE = "chargeops.settings"
 python_files = ["test_*.py", "tests.py"]
 addopts = "-q --strict-markers"
 testpaths = ["core", "billing", "ingestion", "intelligence", "portal"]
+markers = [
+    "slow: teste que gera meses de dados sinteticos (dezenas de segundos)",
+]

@@ -43,6 +43,15 @@
     0.01826215022091311,
     0.007069219440353461
   ],
+  "residential_weekday_weights": [
+    0.135,
+    0.135,
+    0.135,
+    0.135,
+    0.145,
+    0.16,
+    0.155
+  ],
   "hour_shift": 9,
   "source": {
     "dataset": "High-resolution electric vehicle charging data from a workplace setting",
@@ -53,5 +62,5 @@
     "file": "ev_workplace_charging_data.tab (v4)",
     "license": "CC0 1.0"
   },
-  "note": "Energia NAO e calibrada neste dataset (potencia media implicita de 2,13 kW contra 7 kW do HCA G2): e derivada por fisica no gerador."
+  "note": "Energia NAO e calibrada neste dataset (potencia media implicita de 2,13 kW contra 7 kW do HCA G2): e derivada por fisica no gerador. weekday_weights e o padrao OBSERVADO no workplace, guardado por transparencia; a geracao usa residential_weekday_weights, que e PREMISSA declarada da equipe -- o dataset nunca observou um condominio."
 }

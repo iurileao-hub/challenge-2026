@@ -23,3 +23,6 @@ app/staticfiles/
 app/*.log
 .pytest_cache/
 *.pyc
+
+# Handoff de sessao (artefato de processo)
+HANDOFF.md

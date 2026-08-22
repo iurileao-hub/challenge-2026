@@ -132,6 +132,91 @@ Total estimado: 13–17 dias ativos. A ordem é deliberada: dados antes de tudo 
 
 **Pendências e radar** (itens que não bloqueiam o início): chave gratuita da Open Charge Map (registro de conta, minutos); validação do tratamento de tributos do rateio com administradora e contador; visita ao Energy Innovation Lab para verificar o modelo exato do HCA G2 instalado e, se viável, capturar dado real; acompanhamento da Consulta Pública ANEEL 42/2025 e do decreto regulamentador da Lei 18.403/2026.
 
+## Sprint 2: a plataforma implementada
+
+O plano acima foi executado. O código está em [`app/`](app/), com instruções de execução no
+[README da aplicação](app/README.md). Python 3.12, Django 5.2, PostgreSQL 16, pandas e
+scikit-learn: as tecnologias que a Sprint 1 escolheu, sem substituição. O framework web ficou
+em **Django**, pela velocidade nas etapas de interface.
+
+| # | Etapa do plano | Estado | Onde |
+|---|---|---|---|
+| 1 | Gerador de dados sintéticos | implementado, calibrado no dado real, com gabarito | `app/ingestion/generator.py` |
+| 2 | Ingestão + banco | 14 entidades migradas; gateway com adaptadores SEMS (stub) e dataset | `app/core/models.py`, `app/ingestion/` |
+| 3 | Motor de rateio com testes | fórmula, casos excepcionais, reconciliação em dois tempos | `app/billing/` |
+| 4 | Painel do gestor | ocupação, saúde dos pontos, fila de auditoria, relatório exportável | `app/portal/` |
+| 5 | Módulo de IA | previsão com backtest e detecção em duas fases, avaliada contra gabarito | `app/intelligence/` |
+| 6 | Portal do usuário | extrato linha a linha, fatura explicada, contestação | `app/portal/` |
+
+### A aposta verificável, verificada
+
+A Frente 3-C encerrou com uma aposta explícita: *se a Sprint 2 conseguir implementar o motor
+de rateio e o gerador sintético somente com o que está nestas tabelas, sem migração de
+emergência, o contrato terá cumprido seu papel.*
+
+A aposta foi ganha, e é conferível. As 14 entidades entraram em uma migração inicial; a
+segunda adiciona restrições de não sobreposição de vigências, e a terceira apenas acentua
+rótulos de exibição. Nenhuma entidade nova, nenhum campo de emergência. Os nomes de tabela no
+banco são idênticos aos do dicionário do dossiê, justamente para tornar essa conferência
+possível linha a linha.
+
+O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
+faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
+de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
+escrito meses antes do código, e não lidos da implementação. São 47 testes no total.
+
+### O que a implementação ensinou e a pesquisa não tinha visto
+
+Três correções que só apareceram ao medir. Registramos porque são o conteúdo real desta
+sprint.
+
+**O espelhamento do eixo horário estava subespecificado.** A estratégia de dados previa
+espelhar o padrão diurno do dataset de local de trabalho para o noturno de condomínio. O
+espelho literal de 12 horas joga o segundo pico do dataset (16h às 18h, a saída do trabalho)
+para as 4h da manhã, e ninguém pluga o carro na garagem de casa às 5h. O espelhamento correto
+não é do relógio, e sim do **evento**: o dataset registra "cheguei e pluguei", que no
+trabalho acontece por volta das 11h e em casa por volta das 20h. O deslocamento passou a ser
+de 9 horas, e o pico caiu onde se espera.
+
+**O dataset não pode informar o ciclo semanal.** O eixo horário é realinhável porque o evento
+existe nos dois contextos. O padrão de dias da semana, não: no escritório a demanda desaba no
+fim de semana, e num prédio residencial é justamente quando o morador está em casa.
+Separamos os dois. Os pesos observados no dataset ficam registrados por transparência, e a
+geração usa um perfil residencial **declarado como premissa da equipe**. Preferimos marcar a
+fronteira entre o que foi medido e o que foi assumido a disfarçá-la.
+
+**Sem métrica, três detectores pareciam funcionar.** O gabarito do gerador revelou que a
+injeção de consumo anômalo era desfeita pelo próprio modelo físico (recall zero); que a saúde
+do ponto estava classificada como anomalia de sessão, produzindo uma "precisão de 700%", um
+número impossível que denunciou o erro de contagem; e que a ociosidade injetada raramente
+ultrapassava o limiar. Corrigidos os três, o recall é de 100% nas cinco categorias. É o
+argumento prático para a exigência de IA não decorativa: decorativa é o que não tem métrica,
+porque nada nela pode ser reprovado.
+
+### A IA no lugar que a Sprint 1 prometeu
+
+A detecção roda **antes do fechamento da fatura**: a linha suspeita entra marcada e a fatura
+vai para o estado de auditoria. Há um teste cujo único propósito é sustentar essa afirmação.
+Se alguém remover a detecção, ele quebra por quebrar o ciclo de estados da fatura, não por
+faltar um gráfico.
+
+Duas decisões reforçam a mesma tese. A previsão declara o método e o erro do backtest **na
+própria tela**, e quando o gradient boosting perde da média por dia da semana a plataforma
+serve a média e diz que serviu: previsão que o síndico não consegue explicar em assembleia
+não embasa decisão nenhuma. E nenhuma saída de IA altera cobrança. Confirmar ou descartar uma
+anomalia muda o estado da fatura, nunca o valor. A plataforma produz evidência; a decisão é
+de quem responde por ela.
+
+### Limites declarados
+
+Nenhum evento real de um HCA G2 atravessou este pipeline. O adaptador SEMS é um stub sobre o
+contrato espelhado da documentação pública: o mapeamento de campos está escrito e testado, e
+o que muda no dia em que houver credencial são as poucas linhas que buscam o payload. O
+gateway foi construído para tornar essa troca barata, e há um teste que mostra um JSON de API
+de fabricante e um TSV acadêmico de 2014 entrando pelo mesmo caminho e saindo
+indistinguíveis para o motor de rateio. Mas mostrar que o cano é agnóstico não é o mesmo que
+já ter passado dado real por ele.
+
 ## Uso de inteligência artificial
 
 A equipe usou assistentes de IA (Claude) como ferramenta de pesquisa e redação ao longo de toda a Sprint 1, sob direção e revisão humana. Toda fonte citada neste README e nos dossiês foi efetivamente acessada e verificada — o método de cada seção (texto oficial baixado do site do órgão, chamada real de API com resposta preservada, leitura íntegra de datasheet e manual) está declarado nos blocos "Método" no início das seções dos dossiês, e nenhuma referência entrou nas listas sem acesso confirmado.

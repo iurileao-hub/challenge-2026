@@ -1,0 +1,38 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "records": [
+      {
+        "id": "EVC-2026-06-000181",
+        "sn": "57000HPA247L0002",
+        "card_no": "RFID-ANA",
+        "start_time": "2026-07-03T21:15:00",
+        "end_time": "2026-07-04T02:40:00",
+        "start_kwh": 1203.120,
+        "end_kwh": 1224.470,
+        "charge_kwh": 21.350,
+        "max_power": 6.90,
+        "stop_reason": "Local",
+        "meter_values": [
+          {"ts": "2026-07-03T21:30:00", "power": 6.90, "kwh_total": 1204.845, "state": "charging"},
+          {"ts": "2026-07-03T23:00:00", "power": 6.85, "kwh_total": 1215.120, "state": "charging"},
+          {"ts": "2026-07-04T02:40:00", "power": 0.00, "kwh_total": 1224.470, "state": "finished"}
+        ]
+      },
+      {
+        "id": "EVC-2026-06-000182",
+        "sn": "57000HPA247L0002",
+        "card_no": "RFID-DESCONHECIDO",
+        "start_time": "2026-07-05T22:05:00",
+        "end_time": "2026-07-06T01:10:00",
+        "start_kwh": 1224.470,
+        "end_kwh": 1236.900,
+        "charge_kwh": 12.430,
+        "max_power": 6.80,
+        "stop_reason": "EVDisconnected",
+        "meter_values": []
+      }
+    ]
+  }
+}

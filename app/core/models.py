@@ -665,6 +665,20 @@ class InvoiceLine(models.Model):
     amount = models.DecimalField("valor (R$)", max_digits=10, decimal_places=2)
     flagged_for_audit = models.BooleanField("marcada para auditoria", default=False)
 
+    @property
+    def descricao_amigavel(self) -> str:
+        """A mesma linha, na tela de quem ja sabe o proprio nome.
+
+        `description` continua sendo o registro persistido -- e o que o CSV da
+        assembleia exporta e o que a trilha de auditoria preserva. Esta
+        propriedade so muda a forma de apresentar, nunca o que foi gravado.
+        """
+        if self.kind != "session" or not self.session_id:
+            return self.description
+        from billing.engine import _session_description
+
+        return _session_description(self.session, com_nome=False)
+
     class Meta:
         db_table = "invoice_line"
         verbose_name = "linha de fatura"
@@ -759,6 +773,20 @@ class AnomalyFlag(models.Model):
                 name="anomaly_status_valid",
             ),
         ]
+
+    #: Como cada detector se apresenta a quem nao e da area. "isolation_forest"
+    #: nao significa nada para uma sindica, e "detector: rule" e pior ainda --
+    #: parece codigo vazando. O nome tecnico continua no campo `detector`,
+    #: que e o que a trilha de auditoria e o CSV preservam.
+    DETECTOR_LEGIVEL = {
+        "rule": "verificação automática de leitura",
+        "isolation_forest": "comparação com o padrão histórico da credencial",
+        "morador": "contestação do próprio morador",
+    }
+
+    @property
+    def detector_legivel(self) -> str:
+        return self.DETECTOR_LEGIVEL.get(self.detector, self.detector)
 
     def __str__(self):
         return f"[{self.get_category_display()}] {self.explanation[:60]}"

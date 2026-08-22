@@ -90,13 +90,13 @@ def test_menu_do_gestor_e_do_morador_sao_diferentes(client, cenario):
     """O `e_gestor` do context processor: variavel ausente em template Django e
     silenciosamente vazia, e o menu aparecia errado sem quebrar nada."""
     entrar(client, "sindica")
-    assert "Relatório da assembleia" in client.get("/painel/").content.decode()
+    assert "Prestação de contas" in client.get("/painel/").content.decode()
     client.logout()
 
     entrar(client, "carla")
     corpo = client.get("/extrato/").content.decode()
-    assert "Minha fatura" in corpo
-    assert "Relatório da assembleia" not in corpo
+    assert "Minha conta" in corpo
+    assert "Prestação de contas" not in corpo
 
 
 # --------------------------------------------------------------------------
@@ -189,9 +189,15 @@ def test_contestacao_sem_motivo_e_recusada(client, cenario):
 def test_relatorio_lista_as_unidades_em_ordem_numerica(client, cenario):
     """Ordem de texto produz 102, 105, 110, 12, 21 -- correto para o banco e
     absurdo para quem le uma lista de apartamentos."""
+    import re
+
     entrar(client, "sindica")
     corpo = client.get("/painel/relatorio/").content.decode()
-    posicoes = [corpo.index(f">{l}</td>") for l in ["12", "34", "72", "105", "110"]]
+    # Le a coluna de unidade pelo `data-rotulo`, nao pela marcacao interna da
+    # celula: o teste vigia a ORDEM, e nao pode quebrar quando a apresentacao
+    # da celula muda.
+    rotulos = re.findall(r'data-rotulo="Unidade">\s*(?:<strong>)?\s*([^<\s]+)', corpo)
+    posicoes = [rotulos.index(l) for l in ["12", "34", "72", "105", "110"]]
     assert posicoes == sorted(posicoes)
 
 

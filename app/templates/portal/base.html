@@ -14,11 +14,14 @@
   <nav>
     {% if e_gestor %}
       <a href="{% url 'painel' %}" class="{% if pagina == 'painel' %}ativo{% endif %}">Painel</a>
-      <a href="{% url 'relatorio' %}" class="{% if pagina == 'relatorio' %}ativo{% endif %}">Relatório da assembleia</a>
+      <a href="{% url 'relatorio' %}" class="{% if pagina == 'relatorio' %}ativo{% endif %}">Prestação de contas</a>
     {% else %}
-      <a href="{% url 'extrato' %}" class="{% if pagina == 'extrato' %}ativo{% endif %}">Minha fatura</a>
+      <a href="{% url 'extrato' %}" class="{% if pagina == 'extrato' %}ativo{% endif %}">Minha conta</a>
     {% endif %}
-    <span class="quem">{{ user.get_full_name|default:user.username }}</span>
+    <span class="quem">
+      <b>{{ app_user_atual.name|default:user.get_full_name|default:user.username }}</b>
+      {% if e_gestor %}· síndica{% elif app_user_atual.unit %}· unidade {{ app_user_atual.unit.label }}{% endif %}
+    </span>
     <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}
       <button type="submit">Sair</button>
     </form>

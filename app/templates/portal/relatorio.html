@@ -2,70 +2,79 @@
 {% block titulo %}Relatório da assembleia — EV ChargeOps{% endblock %}
 {% block conteudo %}
 
-<h1>Relatório de rateio — {{ competencia }}</h1>
-<p class="sub">{{ condo.name }} · documento de prestação de contas para a assembleia</p>
+<h1>Prestação de contas — {{ competencia }}</h1>
+<p class="sub">{{ condo.name }} · documento para levar à assembleia</p>
 
-<div class="grade n4">
-  <div class="cartao metrica">
-    <div class="rotulo">Energia rateada</div>
-    <div class="valor"><small>R$</small> {{ energia|floatformat:2 }}</div>
-    <div class="nota">{{ kwh|floatformat:3 }} kWh medidos</div>
+<div class="faixa-estado {% if em_auditoria %}pendente{% endif %}">
+  <div class="icone" aria-hidden="true">{% if em_auditoria %}⏸{% else %}✓{% endif %}</div>
+  <div class="texto">
+    <div class="titulo">R$ {{ total|floatformat:2 }} arrecadados em {{ competencia }}</div>
+    <div class="detalhe">
+      {% if em_auditoria %}
+        {{ em_auditoria }} fatura{{ em_auditoria|pluralize:"s" }} ainda em revisão. O valor acima
+        pode mudar quando o síndico decidir sobre {{ em_auditoria|pluralize:"ela,elas" }}.
+      {% else %}
+        Todas as {{ faturas|length }} faturas foram conferidas e fechadas. Nenhuma pendência.
+      {% endif %}
+    </div>
   </div>
-  <div class="cartao metrica">
+  <a class="botao" href="{% url 'relatorio' %}?competencia={{ competencia }}&formato=csv">Baixar planilha</a>
+</div>
+
+<div class="grade n3">
+  <div class="cartao metrica discreta">
+    <div class="rotulo">Energia consumida</div>
+    <div class="valor"><small>R$</small> {{ energia|floatformat:2 }}</div>
+    <div class="nota">{{ kwh|floatformat:1 }} kWh medidos, repassados sem margem</div>
+  </div>
+  <div class="cartao metrica discreta">
     <div class="rotulo">Taxa de disponibilidade</div>
     <div class="valor"><small>R$</small> {{ disponibilidade|floatformat:2 }}</div>
-    <div class="nota">entre {{ aderentes }} unidades aderentes</div>
+    <div class="nota">dividida entre {{ aderentes }} unidades do programa</div>
   </div>
-  <div class="cartao metrica">
-    <div class="rotulo">Ajustes de tarifa</div>
+  <div class="cartao metrica discreta">
+    <div class="rotulo">Acerto do mês anterior</div>
     <div class="valor"><small>R$</small> {{ ajustes|floatformat:2 }}</div>
-    <div class="nota">reconciliação da competência anterior</div>
-  </div>
-  <div class="cartao metrica">
-    <div class="rotulo">Total arrecadado</div>
-    <div class="valor"><small>R$</small> {{ total|floatformat:2 }}</div>
-    <div class="nota">
-      {% if em_auditoria %}<span class="selo aviso">{{ em_auditoria }} em auditoria</span>
-      {% else %}<span class="selo ok">sem pendência</span>{% endif %}
-    </div>
+    <div class="nota">diferença entre o preço provisório e o efetivo</div>
   </div>
 </div>
 
 <div class="cartao">
-  <h2>Faturas por unidade</h2>
-  <table>
-    <tr>
-      <th>Unidade</th><th class="num">Sessões</th><th class="num">kWh</th>
-      <th class="num">Energia</th><th class="num">Disponibilidade</th>
-      <th class="num">Ajuste</th><th class="num">Total</th><th>Situação</th>
-    </tr>
-    {% for f in faturas %}
-    <tr>
-      <td>{% if f.unit %}{{ f.unit.label }}{% else %}visitante — {{ f.visitor_user.name }}{% endif %}</td>
-      <td class="num">{{ f.n_sessoes }}</td>
-      <td class="num">{{ f.kwh|floatformat:3 }}</td>
-      <td class="num">{{ f.v_energia|floatformat:2 }}</td>
-      <td class="num">{{ f.v_taxa|floatformat:2 }}</td>
-      <td class="num">{% if f.v_ajuste %}{{ f.v_ajuste|floatformat:2 }}{% else %}—{% endif %}</td>
-      <td class="num"><strong>{{ f.total_amount|floatformat:2 }}</strong></td>
-      <td>
-        {% if f.status == 'under_review' %}<span class="selo aviso">auditoria</span>
-        {% elif f.status == 'closed' %}<span class="selo ok">fechada</span>
-        {% else %}<span class="selo neutro">{{ f.get_status_display }}</span>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  <p style="margin-top:16px">
-    <a class="botao" href="{% url 'relatorio' %}?competencia={{ competencia }}&formato=csv">Exportar CSV</a>
-  </p>
+  <h2>Quanto cada unidade pagou</h2>
+  <div class="rolagem">
+    <table class="empilha">
+      <tr class="cabecalho">
+        <th>Unidade</th><th class="num">Recargas</th><th class="num">kWh</th>
+        <th class="num">Energia</th><th class="num">Disponibilidade</th>
+        <th class="num">Acerto</th><th class="num">Total</th><th>Situação</th>
+      </tr>
+      {% for f in faturas %}
+      <tr>
+        <td data-rotulo="Unidade"><strong>{% if f.unit %}{{ f.unit.label }}{% else %}visitante · {{ f.visitor_user.name }}{% endif %}</strong></td>
+        <td data-rotulo="Recargas" class="num {% if not f.n_sessoes %}sem-valor{% endif %}">{{ f.n_sessoes }}</td>
+        <td data-rotulo="kWh" class="num {% if not f.n_sessoes %}sem-valor{% endif %}">{{ f.kwh|floatformat:1 }}</td>
+        <td data-rotulo="Energia" class="num {% if not f.n_sessoes %}sem-valor{% endif %}">{{ f.v_energia|floatformat:2 }}</td>
+        <td data-rotulo="Disponibilidade" class="num">{{ f.v_taxa|floatformat:2 }}</td>
+        <td data-rotulo="Acerto" class="num {% if not f.v_ajuste %}sem-valor{% endif %}">{% if f.v_ajuste %}{{ f.v_ajuste|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td data-rotulo="Total" class="num"><strong>R$ {{ f.total_amount|floatformat:2 }}</strong></td>
+        <td data-rotulo="Situação">
+          {% if f.status == 'under_review' %}<span class="selo aviso">em revisão</span>
+          {% elif f.status == 'closed' %}<span class="selo ok">fechada</span>
+          {% else %}<span class="selo neutro">{{ f.get_status_display }}</span>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="vazio">Nenhuma fatura emitida para {{ competencia }}.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </div>
 
 <p class="rodape-nota">
-  Tarifa aplicada nesta competência: R$ {{ tarifa|floatformat:4 }}/kWh (provisória).
-  Cada valor desta tabela é a soma das linhas da fatura correspondente, arredondadas a centavos
-  meio-para-cima uma a uma — o mesmo número que o morador vê no extrato dele.
-  O resíduo do rateio da taxa de disponibilidade, quando a divisão não é exata, fica com o caixa
-  do condomínio e é declarado aqui.
+  Preço aplicado nesta competência: R$ {{ tarifa|floatformat:4 }} por kWh (provisório).
+  Cada valor desta tabela é a soma das linhas da fatura correspondente, arredondadas a
+  centavos meio-para-cima uma a uma — é o mesmo número que o morador vê no extrato dele.
+  O resíduo do rateio da taxa de disponibilidade, quando a divisão não é exata, fica com o
+  caixa do condomínio e é declarado aqui.
 </p>
 {% endblock %}

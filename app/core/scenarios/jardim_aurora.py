@@ -117,7 +117,7 @@ def build_jardim_aurora(*, extra_residents: bool = False) -> dict:
     carla = AppUser.objects.create(name="Carla Menezes", email="carla@jardimaurora.test", unit=units["34"])
     davi = AppUser.objects.create(name="Davi Lopes", email="davi@jardimaurora.test", unit=units["105"])
     gestor = AppUser.objects.create(
-        name="Sonia Duarte (sindica)", email="sindica@jardimaurora.test",
+        name="Sonia Duarte", email="sindica@jardimaurora.test",
         unit=None, role=AppUser.Role.MANAGER,
     )
 

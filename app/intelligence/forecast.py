@@ -116,7 +116,7 @@ def forecast(condominium, *, today: date, horizon: int = HORIZON_DAYS) -> Foreca
         # Sem historico, media simples e declarada como tal -- o cold start que
         # a Opcao B previu, resolvido por honestidade e nao por extrapolacao.
         media = float(series.kwh.mean()) if len(series) else 0.0
-        result.method = f"media historica ({len(series)} dias -- insuficiente para treinar)"
+        result.method = f"média do histórico ({len(series)} dias, ainda pouco para o sistema aprender)"
         result.days = [
             DayForecast(today + timedelta(days=i + 1), media, 0.0) for i in range(horizon)
         ]
@@ -164,8 +164,8 @@ def forecast(condominium, *, today: date, horizon: int = HORIZON_DAYS) -> Foreca
 
         result.chosen_model = "gradient_boosting"
         result.method = (
-            "gradient boosting sobre features de calendario (dia da semana, dia do "
-            "mes, fim de semana, tendencia)"
+            "o sistema aprendeu com o histórico do próprio condomínio e considera "
+            "o dia da semana, o dia do mês e a tendência recente"
         )
     else:
         wd = pd.to_datetime(series.day).dt.weekday
@@ -176,8 +176,8 @@ def forecast(condominium, *, today: date, horizon: int = HORIZON_DAYS) -> Foreca
 
         result.chosen_model = "baseline_sazonal"
         result.method = (
-            "media historica por dia da semana -- o gradient boosting foi treinado "
-            "e REPROVADO no backtest (erro maior que o da media), entao nao e usado"
+            "média do histórico por dia da semana. O modelo mais elaborado foi "
+            "treinado, testado e REPROVADO (errou mais que a média), então não é usado"
         )
     result.days = [
         DayForecast(d, float(k), float(s)) for d, k, s in zip(future_days, preds, sess_preds)

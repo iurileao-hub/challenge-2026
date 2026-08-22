@@ -3,9 +3,13 @@
 {% block conteudo %}
 <div class="entrar">
   <div class="cartao">
-    <h1>EV ChargeOps</h1>
-    <p class="sub">Gestão de recarga compartilhada</p>
-    {% if form.errors %}<div class="alerta critico">Usuário ou senha inválidos.</div>{% endif %}
+    <h1>EV <span style="color:var(--accent)">ChargeOps</span></h1>
+    <p class="sub">A recarga do condomínio, dividida com conta explicada.</p>
+    {% if form.errors %}
+      <div class="alerta critico">
+        Usuário ou senha não conferem. Confira se não há espaço sobrando e tente de novo.
+      </div>
+    {% endif %}
     <form method="post">
       {% csrf_token %}
       <div class="campo">
@@ -19,8 +23,9 @@
       <button type="submit" class="primario">Entrar</button>
     </form>
     <p class="dica">
-      Demonstração — senha <code>chargeops</code>.<br>
-      <strong>sindica</strong> (gestora do condomínio) · <strong>ana</strong>, <strong>carla</strong>, <strong>davi</strong> (moradores)
+      <strong>Demonstração</strong> — a senha de todos é <code>chargeops</code>.<br>
+      <strong>sindica</strong> para ver o painel de quem administra o condomínio.<br>
+      <strong>ana</strong>, <strong>carla</strong> ou <strong>davi</strong> para ver a conta de um morador.
     </p>
   </div>
 </div>

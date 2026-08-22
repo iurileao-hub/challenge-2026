@@ -161,20 +161,47 @@ def billable_sessions(condominium: Condominium, competence: Competence):
     )
 
 
-def _session_description(session: ChargingSession) -> str:
+#: Vocabulario OCPP traduzido para quem le a fatura.
+#:
+#: O codigo cru continua em `ChargingSession.stop_reason` -- e o registro
+#: tecnico, e nao se perde. Mas "PowerLoss" na fatura de um morador de 70 anos
+#: nao informa nada: informa que o sistema nao foi escrito para ele.
+RAZAO_LEGIVEL = {
+    "PowerLoss": "queda de energia",
+    "EVDisconnected": "o cabo foi retirado do carro",
+    "EmergencyStop": "botão de emergência acionado",
+    "Local": "encerrada no próprio carregador",
+    "Remote": "encerrada pelo aplicativo",
+    "PowerPathError": "falha elétrica no carregador",
+}
+
+
+def razao_legivel(reason: str | None) -> str:
+    if not reason:
+        return "motivo não informado"
+    return RAZAO_LEGIVEL.get(reason, reason)
+
+
+def _session_description(session: ChargingSession, *, com_nome: bool = True) -> str:
     """Texto do extrato. E o que o morador le -- precisa dizer *quando*, *quem*
-    e, se algo saiu do normal, *o que*."""
+    e, se algo saiu do normal, *o que*.
+
+    `com_nome=False` serve a tela do proprio morador, onde repetir o nome dele
+    em cada linha e ruido: ele ja sabe quem e.
+    """
     from billing.competence import condo_tz
 
     local = session.session_start.astimezone(condo_tz())
-    quem = session.credential.user.name if session.credential else "credencial não resolvida"
-    base = f"Recarga {local.strftime('%d/%m %H:%M')} — {quem}"
+    base = f"Recarga de {local.strftime('%d/%m')} às {local.strftime('%H:%M')}"
+    if com_nome:
+        quem = session.credential.user.name if session.credential else "credencial não resolvida"
+        base += f" — {quem}"
     if session.status == ChargingSession.Status.INTERRUPTED:
-        base += f" — sessão interrompida ({session.stop_reason or 'motivo não informado'})"
+        base += f" — sessão interrompida: {razao_legivel(session.stop_reason)}"
     elif session.status == ChargingSession.Status.FAULT:
-        base += f" — falha no ponto ({session.stop_reason or 'motivo não informado'})"
+        base += f" — falha no carregador: {razao_legivel(session.stop_reason)}"
     if session.meter_stop is None:
-        base += " — leitura final perdida, cobrada a última leitura conhecida"
+        base += " — a leitura final não chegou, cobrada a última leitura confirmada"
     return base
 
 

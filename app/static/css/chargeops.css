@@ -1,23 +1,41 @@
 /* EV ChargeOps -- folha unica, sem framework externo.
    Decisao consciente: a plataforma roda em infraestrutura modesta e a
    dependencia de CDN seria um ponto de falha a mais numa garagem com wi-fi
-   ruim. O que precisamos aqui cabe em CSS moderno nativo. */
+   ruim. O que precisamos aqui cabe em CSS moderno nativo.
+
+   Conceito: "extrato bancario com semaforo". O produto e um documento
+   financeiro que precisa ser confiado por gente desconfiada, entao a cor
+   carrega SEMPRE o mesmo significado:
+
+     verde  = conferido, fechado, pode confiar
+     ambar  = a maquina parou e esta esperando uma pessoa
+     rubro  = falha de equipamento ou acao destrutiva
+
+   Ambar e a cor-assinatura da tese do produto. Nunca usar por decoracao. */
 
 :root {
-  --bg: #f6f7f9;
+  --bg: #f5f7f8;
   --surface: #ffffff;
   --border: #e2e5ea;
   --ink: #14181f;
-  --ink-soft: #5b6472;
-  --ink-faint: #8d95a3;
+  --ink-soft: #55606e;     /* texto secundario legivel: ~6.6:1 no branco */
+  --ink-faint: #8d95a3;    /* SO decorativo (eixos, separadores). Nunca texto. */
+
   --accent: #0f6b4f;
   --accent-soft: #e6f2ee;
-  --warn: #9a5b00;
-  --warn-soft: #fdf2e0;
+  --accent-line: #cfe4dc;
+
+  --warn: #8a4f00;         /* ~6.2:1 no branco */
+  --warn-soft: #fdf3e3;
+  --warn-line: #f0d9ae;
+
   --danger: #a32424;
   --danger-soft: #fbeaea;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(20, 24, 31, .06), 0 4px 12px rgba(20, 24, 31, .04);
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(20, 24, 31, .05), 0 4px 14px rgba(20, 24, 31, .045);
+  --toque: 44px;           /* alvo minimo de toque confortavel */
 }
 
 * { box-sizing: border-box; }
@@ -32,29 +50,57 @@ body {
 
 a { color: var(--accent); }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- topo --- */
+
 header.topo {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 14px 28px;
+  padding: 12px 28px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 10px 18px;
   position: sticky;
   top: 0;
   z-index: 10;
 }
-header.topo .marca { font-weight: 650; letter-spacing: -.2px; }
+header.topo .marca { font-weight: 700; letter-spacing: -.2px; }
 header.topo .marca span { color: var(--accent); }
-header.topo nav { margin-left: auto; display: flex; gap: 18px; align-items: center; }
-header.topo nav a { color: var(--ink-soft); text-decoration: none; font-size: 14px; }
-header.topo nav a:hover, header.topo nav a.ativo { color: var(--accent); }
-header.topo .quem { font-size: 13px; color: var(--ink-faint); }
+header.topo nav {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+}
+header.topo nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 11px 2px;
+  min-height: var(--toque);
+  display: inline-flex;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+}
+header.topo nav a:hover { color: var(--accent); }
+header.topo nav a.ativo { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
+header.topo .quem { font-size: 13px; color: var(--ink-soft); }
+header.topo .quem b { font-weight: 600; color: var(--ink); }
 
-main { max-width: 1120px; margin: 0 auto; padding: 26px 28px 60px; }
+main { max-width: 1120px; margin: 0 auto; padding: 24px 28px 64px; }
 
-h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.3px; }
-h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: -.1px; }
-.sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 24px; }
+h1 { font-size: 23px; margin: 0 0 4px; letter-spacing: -.3px; font-weight: 700; }
+h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: -.1px; font-weight: 600; }
+.sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; }
+
+/* ------------------------------------------------------------- cartoes --- */
 
 .cartao {
   background: var(--surface);
@@ -62,96 +108,313 @@ h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: -.1px; }
   border-radius: var(--radius);
   padding: 18px 20px;
   box-shadow: var(--shadow);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
+.cartao > h2:first-child { margin-top: 0; }
 
-.grade { display: grid; gap: 14px; }
+.grade { display: grid; gap: 14px; align-items: start; }
 .grade.n4 { grid-template-columns: repeat(4, 1fr); }
 .grade.n3 { grid-template-columns: repeat(3, 1fr); }
-.grade.n2 { grid-template-columns: 1.4fr 1fr; }
-@media (max-width: 900px) {
-  .grade.n4, .grade.n3, .grade.n2 { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 560px) {
-  .grade.n4, .grade.n3, .grade.n2 { grid-template-columns: 1fr; }
-}
+.grade.n2 { grid-template-columns: 1.45fr 1fr; }
 
 .metrica .rotulo {
   font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--ink-faint); margin-bottom: 6px;
+  color: var(--ink-soft); margin-bottom: 6px; font-weight: 600;
 }
-.metrica .valor { font-size: 26px; font-weight: 620; letter-spacing: -.6px; }
-.metrica .valor small { font-size: 14px; font-weight: 500; color: var(--ink-soft); }
-.metrica .nota { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+.metrica .valor { font-size: 27px; font-weight: 700; letter-spacing: -.6px; }
+.metrica .valor small { font-size: 14px; font-weight: 400; color: var(--ink-soft); }
+.metrica .nota { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; }
+
+/* metricas secundarias: mesma informacao, peso visual menor */
+.metrica.discreta { padding: 14px 16px; }
+.metrica.discreta .valor { font-size: 21px; }
+
+/* ------------------------------------------------- faixa de estado (A2) ---
+   Primeira coisa da pagina. Responde "esta tudo bem?" antes de qualquer
+   numero. Ambar quando ha decisao pendente, verde quando nao ha. */
+
+.faixa-estado {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+}
+.faixa-estado .icone {
+  width: 40px; height: 40px; flex: none;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 20px;
+  background: var(--surface);
+  border: 1px solid var(--accent-line);
+}
+.faixa-estado .texto { flex: 1 1 260px; }
+.faixa-estado .titulo { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+.faixa-estado .detalhe { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; }
+.faixa-estado.pendente { border-color: var(--warn-line); background: var(--warn-soft); }
+.faixa-estado.pendente .icone { border-color: var(--warn-line); }
+.faixa-estado.pendente .titulo { color: var(--warn); }
+
+/* ------------------------------------------------------- trilha da tese ---
+   Sessao -> anomalia -> linha marcada -> fatura retida -> decisao humana.
+   As quatro primeiras etapas a maquina ja fez; a quinta espera uma pessoa.
+   Conta a tese do produto sem pedir que ninguem leia um paragrafo. */
+
+.trilha { display: flex; margin: 4px 0 18px; }
+.trilha .etapa {
+  flex: 1;
+  position: relative;
+  text-align: center;
+  padding-top: 24px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+.trilha .etapa::before {          /* conector com a etapa anterior */
+  content: "";
+  position: absolute; top: 8px; left: -50%;
+  width: 100%; height: 2px;
+  background: var(--accent);
+}
+.trilha .etapa:first-child::before { display: none; }
+.trilha .etapa::after {           /* marcador */
+  content: "";
+  position: absolute; top: 3px; left: 50%;
+  transform: translateX(-50%);
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.trilha .etapa.agora { color: var(--warn); font-weight: 700; }
+.trilha .etapa.agora::after { background: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
+.trilha .etapa.agora::before { background: linear-gradient(90deg, var(--accent), var(--warn)); }
+
+/* --------------------------------------------------------------- tabela ---
+   `.rolagem` e obrigatoria em volta de TODA tabela: sem ela a tabela vaza
+   fisicamente para fora do cartao no celular. */
+
+.rolagem { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th {
-  text-align: left; font-weight: 560; font-size: 12px; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--ink-faint); padding: 0 10px 8px;
-  border-bottom: 1px solid var(--border);
+  text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--ink-soft); padding: 0 10px 8px;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
 }
-td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td { padding: 11px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 tr:last-child td { border-bottom: 0; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr.total td { font-weight: 620; border-top: 2px solid var(--ink); border-bottom: 0; }
+/* "R$ 16,06" quebrando entre o simbolo e o numero e o tipo de detalhe que
+   faz uma fatura parecer amadora. */
+td.num { white-space: nowrap; }
+tr.total td { font-weight: 700; border-top: 2px solid var(--ink); border-bottom: 0; }
+
+.vazio { color: var(--ink-soft); font-size: 13.5px; padding: 18px 10px; }
+
+/* --------------------------------------------------------------- selos --- */
 
 .selo {
-  display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size: 11.5px; font-weight: 560; letter-spacing: .02em;
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
+  white-space: nowrap;
 }
 .selo.ok { background: var(--accent-soft); color: var(--accent); }
-.selo.aviso { background: var(--warn-soft); color: var(--warn); }
+.selo.aviso { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
 .selo.perigo { background: var(--danger-soft); color: var(--danger); }
 .selo.neutro { background: #eef0f3; color: var(--ink-soft); }
 
 .linha-auditoria { background: var(--warn-soft) !important; }
+.linha-auditoria td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 
-.barra { display: flex; align-items: flex-end; gap: 3px; height: 76px; margin-top: 6px; }
-.barra .col { flex: 1; background: var(--accent-soft); border-radius: 3px 3px 0 0; position: relative; min-height: 2px; }
+/* ------------------------------------------------------------- graficos --- */
+
+.gsvg { width: 100%; height: auto; display: block; overflow: visible; }
+.gsvg .area { fill: var(--accent-soft); }
+.gsvg .linha { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.gsvg .ponto { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; }
+.gsvg .rotulo { font: 600 12px system-ui, sans-serif; fill: var(--ink); text-anchor: middle; }
+.gsvg .dia { font: 400 11px system-ui, sans-serif; fill: var(--ink-soft); text-anchor: middle; }
+.gsvg .grade-h { stroke: var(--border); stroke-width: 1; }
+.gsvg .curto { display: none; }
+
+.barra { display: flex; align-items: flex-end; gap: 3px; height: 84px; margin-top: 10px; }
+.barra .col {
+  flex: 1; background: var(--accent-soft); border-radius: 3px 3px 0 0;
+  position: relative; min-height: 3px;
+}
 .barra .col.forte { background: var(--accent); }
-.eixo { display: flex; gap: 3px; margin-top: 5px; }
-.eixo span { flex: 1; text-align: center; font-size: 9.5px; color: var(--ink-faint); }
+.barra .col .pico {
+  position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 600; color: var(--accent); white-space: nowrap;
+}
+.eixo { display: flex; gap: 3px; margin-top: 6px; }
+.eixo span { flex: 1; text-align: center; font-size: 11px; color: var(--ink-soft); }
+
+.legenda { font-size: 12.5px; color: var(--ink-soft); margin-top: 10px; }
+
+/* -------------------------------------------------------------- alertas --- */
 
 .alerta {
   border-left: 3px solid var(--warn); background: var(--warn-soft);
-  padding: 11px 14px; border-radius: 0 6px 6px 0; margin-bottom: 9px; font-size: 13.5px;
+  padding: 11px 14px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: 9px; font-size: 13.5px; color: var(--ink);
 }
 .alerta.critico { border-color: var(--danger); background: var(--danger-soft); }
 .alerta.info { border-color: var(--accent); background: var(--accent-soft); }
 
 .explicacao {
   font-size: 13px; color: var(--ink-soft); background: #fafbfc;
-  border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; margin-top: 7px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 11px 13px; margin-top: 10px;
 }
+.explicacao strong { color: var(--ink); }
+
+/* ---------------------------------------------------------------- acoes --- */
 
 button, .botao {
-  font: inherit; font-size: 13px; padding: 6px 13px; border-radius: 6px;
+  font: inherit; font-size: 13.5px; font-weight: 500;
+  padding: 10px 15px; min-height: var(--toque);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--surface); color: var(--ink);
-  cursor: pointer; text-decoration: none; display: inline-block;
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-button:hover { border-color: var(--ink-faint); }
-button.primario { background: var(--accent); color: #fff; border-color: var(--accent); }
-button.perigo { color: var(--danger); }
+button:hover, .botao:hover { border-color: var(--ink-soft); }
+button.primario { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+button.primario:hover { background: #0c5a42; border-color: #0c5a42; }
+button.perigo { color: var(--danger); border-color: #eccaca; }
+
+/* As duas decisoes da fila tem o MESMO peso visual, de proposito.
+   Pintar "liberar a fatura" de verde-primario seria empurrar a sindica para a
+   decisao menos conservadora com o botao mais bonito. A cor aqui carrega o
+   significado do semaforo (ambar = segura, verde = libera) e nada mais. */
+button.reter { color: var(--warn); border-color: var(--warn-line); background: var(--warn-soft); font-weight: 600; }
+button.reter:hover { border-color: var(--warn); }
+button.liberar { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); font-weight: 600; }
+button.liberar:hover { border-color: var(--accent); }
+button.perigo:hover { border-color: var(--danger); }
+
+/* par de decisao: cada botao carrega a consequencia escrita embaixo dele */
+.decisao { display: flex; flex-wrap: wrap; gap: 10px; }
+.decisao .opcao { flex: 1 1 190px; max-width: 260px; }
+.decisao .opcao button { width: 100%; }
+.decisao .consequencia {
+  font-size: 11.5px; line-height: 1.35; color: var(--ink-soft);
+  margin-top: 5px; text-align: left;
+}
+
+/* O "contestar" e o unico controle que o morador realmente precisa achar --
+   nao pode ser o menor alvo da tela. */
+details > summary {
+  min-height: var(--toque);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 form.inline { display: inline; }
-input[type=text], textarea, select {
-  font: inherit; font-size: 14px; padding: 8px 10px; width: 100%;
-  border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+input, textarea, select { font: inherit; }
+input:not([type=checkbox]):not([type=radio]):not([type=submit]),
+textarea, select {
+  font-size: 15px; padding: 11px 12px; width: 100%; min-height: var(--toque);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink);
 }
-label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 5px; }
+input:focus, textarea:focus { border-color: var(--accent); }
+label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 5px; font-weight: 500; }
 
 .aviso-sistema {
-  background: var(--accent-soft); border: 1px solid #cfe4dc; color: var(--accent);
-  padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13.5px;
+  background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent);
+  padding: 12px 15px; border-radius: var(--radius-sm); margin-bottom: 16px;
+  font-size: 13.5px; font-weight: 500;
 }
 
 .rodape-nota {
-  margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border);
-  font-size: 12.5px; color: var(--ink-faint); line-height: 1.6;
+  margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border);
+  font-size: 12.5px; color: var(--ink-soft); line-height: 1.65;
 }
 
-.entrar { max-width: 380px; margin: 90px auto; }
-.entrar .cartao { padding: 26px; }
-.entrar h1 { margin-bottom: 18px; }
-.entrar p.dica { font-size: 12.5px; color: var(--ink-faint); margin-top: 16px; line-height: 1.6; }
-.campo { margin-bottom: 13px; }
+/* ---------------------------------------------------------------- login --- */
+
+.entrar { max-width: 400px; margin: 72px auto; }
+.entrar .cartao { padding: 28px; }
+.entrar h1 { margin-bottom: 2px; }
+.entrar p.sub { margin-bottom: 22px; }
+.entrar button { width: 100%; margin-top: 6px; }
+.entrar p.dica {
+  font-size: 12.5px; color: var(--ink-soft); margin-top: 20px; line-height: 1.65;
+  border-top: 1px solid var(--border); padding-top: 14px;
+}
+.campo { margin-bottom: 14px; }
+
+/* --------------------------------------------------------- responsivo --- */
+
+@media (max-width: 900px) {
+  .grade.n4, .grade.n3, .grade.n2 { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  main { padding: 18px 14px 48px; }
+  header.topo { padding: 10px 14px; }
+  h1 { font-size: 20px; }
+  .cartao { padding: 16px 15px; }
+  .grade.n4, .grade.n3, .grade.n2 { grid-template-columns: 1fr; gap: 10px; }
+  .trilha .etapa { font-size: 10px; padding-top: 22px; }
+  .faixa-estado { padding: 14px 15px; gap: 12px; }
+
+  /* Tabela vira lista de cartoes.
+     `<table class="empilha">` com `data-rotulo` em cada `td`: no celular a
+     tabela deixa de ser tabela e cada linha vira um bloco legivel. Mesma
+     marcacao, sem duplicar HTML. */
+  table.empilha, table.empilha tbody, table.empilha tr, table.empilha td { display: block; width: 100%; }
+  table.empilha thead, table.empilha tr.cabecalho { display: none; }
+  table.empilha tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 0;
+    margin-bottom: 10px;
+    background: var(--surface);
+  }
+  table.empilha tr.linha-auditoria { border-color: var(--warn-line); }
+  table.empilha td {
+    border-bottom: 1px solid #f1f3f5;
+    padding: 9px 14px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+    text-align: left;
+  }
+  table.empilha td.num { text-align: right; white-space: normal; }
+  table.empilha td:last-child { border-bottom: 0; }
+  table.empilha td[data-rotulo]::before {
+    content: attr(data-rotulo);
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--ink-soft); font-weight: 600; flex: none;
+  }
+  table.empilha td.solo { display: block; }
+  table.empilha td.solo::before { display: block; margin-bottom: 4px; }
+  table.empilha td:empty { display: none; }
+  /* celula sem valor vira uma linha "KWH --" inutil quando empilha */
+  table.empilha td.sem-valor { display: none; }
+  table.empilha tr.total {
+    border: 0; border-top: 2px solid var(--ink); border-radius: 0;
+    background: transparent; margin-top: 4px;
+  }
+  table.empilha tr.total td { border-bottom: 0; }
+  .linha-auditoria td:first-child { box-shadow: none; }
+
+  .decisao .opcao { max-width: none; flex: 1 1 100%; }
+
+  /* O SVG escala pelo viewBox: no celular o cartao tem ~330px para 680
+     unidades, ou seja 0,49x. Um rotulo de 11px viraria 5px na tela. O tamanho
+     e compensado em unidades de viewBox, e o rotulo longo cede lugar ao curto
+     porque "Qua 01/07" nesse corpo nao cabe entre dois pontos. */
+  .gsvg .rotulo { font-size: 23px; }
+  .gsvg .dia { font-size: 21px; }
+  .gsvg .longo { display: none; }
+  .gsvg .curto { display: inline; }
+}

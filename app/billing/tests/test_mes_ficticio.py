@@ -76,8 +76,13 @@ def test_unidade_34_cobra_o_medido_ate_a_interrupcao(cenario, fechamento):
     assert linha.amount == Decimal("4.37")
     assert linha.flagged_for_audit is True
     assert "interrompida" in linha.description
-    assert "PowerLoss" in linha.description
-    assert "leitura final perdida" in linha.description
+    assert "leitura final não chegou" in linha.description
+    # O motivo aparece traduzido para quem le a fatura...
+    assert "queda de energia" in linha.description
+    assert "PowerLoss" not in linha.description
+    # ...mas o codigo OCPP cru continua no registro tecnico da sessao. Perder o
+    # vocabulario de origem quebraria a rastreabilidade que a auditoria precisa.
+    assert cenario["sessions"][1005].stop_reason == "PowerLoss"
     # Fatura com linha em auditoria nao fecha silenciosamente.
     assert inv.status == Invoice.Status.UNDER_REVIEW
 

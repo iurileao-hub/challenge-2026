@@ -38,8 +38,64 @@ from core.models import (
 )
 from intelligence.forecast import forecast
 
+#: Abaixo disso, a contagem por hora nao sustenta uma recomendacao de horario.
+MIN_SESSOES_PARA_SUGERIR = 20
+
 #: A demo opera sobre junho/2026, que e a competencia do mes ficticio do dossie.
 DEMO_TODAY = date(2026, 6, 30)
+
+
+def _hora_humana(h: int) -> str:
+    """`6` -> "6h da manha". Sem isso o morador le "6h" como duracao."""
+    if 0 <= h < 5:
+        return f"{h}h da madrugada"
+    if 5 <= h < 12:
+        return f"{h}h da manhã"
+    if 12 <= h < 18:
+        return f"{h}h da tarde"
+    return f"{h}h da noite"
+
+
+def _grafico_previsao(previsao, largura: int = 680, altura: int = 176) -> dict | None:
+    """Geometria do grafico de area da previsao, pronta para o template.
+
+    Template do Django nao faz aritmetica, entao as coordenadas saem calculadas
+    daqui. SVG inline em vez de biblioteca: zero dependencia, coerente com a
+    decisao de nao depender de CDN, e escala sem perder nitidez -- o que importa
+    quando a tela vira video.
+    """
+    dias = list(previsao.days)
+    if not dias:
+        return None
+
+    pad_x, topo, base = 30.0, 30.0, float(altura - 26)
+    teto = (max(d.predicted_kwh for d in dias) or 1.0) * 1.20   # respiro p/ o rotulo
+    passo = (largura - 2 * pad_x) / (len(dias) - 1) if len(dias) > 1 else 0.0
+
+    pontos = []
+    for i, d in enumerate(dias):
+        x = pad_x + i * passo
+        y = base - (d.predicted_kwh / teto) * (base - topo)
+        pontos.append({
+            "x": round(x, 1),
+            "y": round(y, 1),
+            "ry": round(y - 13, 1),        # linha de base do rotulo de valor
+            "dia": d.day,
+            "valor": d.predicted_kwh,
+        })
+
+    linha = " ".join(f"{p['x']},{p['y']}" for p in pontos)
+    return {
+        "largura": largura,
+        "altura": altura,
+        "base": base,
+        "pontos": pontos,
+        "linha": linha,
+        "area": f"{pontos[0]['x']},{base} {linha} {pontos[-1]['x']},{base}",
+        "y_dia": altura - 7,               # linha de base do rotulo de dia
+        "x_fim": largura - 12,
+        "grade": [round(base - k * (base - topo) / 2, 1) for k in (1, 2)],
+    }
 
 
 def _app_user(request) -> AppUser | None:
@@ -111,8 +167,17 @@ def painel(request):
         ocupacao[s.session_start.astimezone(condo_tz()).hour] += 1
     pico = max(ocupacao) or 1
 
+    # Quem esta retido: alimenta a faixa de estado do topo, que responde
+    # "esta tudo bem?" antes de qualquer numero.
+    retidas = [
+        f.unit.label for f in faturas.filter(status=Invoice.Status.UNDER_REVIEW).select_related("unit")
+        if f.unit
+    ]
+
     return render(request, "portal/painel.html", {
         "condo": condo,
+        "grafico": _grafico_previsao(previsao),
+        "unidades_retidas": retidas,
         "competencia": comp,
         "kwh_mes": kwh_mes,
         "sessoes_mes": len(sessions),
@@ -292,9 +357,13 @@ def extrato(request):
         .prefetch_related("lines__session__credential__user")
         .first()
     )
-    competencias = list(
-        Invoice.objects.filter(unit=au.unit).values_list("competence", flat=True).distinct().order_by("-competence")
-    )
+    # "Outras" competencias -- a atual e a pagina onde a pessoa ja esta, e um
+    # botao que aponta para a propria tela e ruido.
+    competencias = [
+        c for c in Invoice.objects.filter(unit=au.unit)
+        .values_list("competence", flat=True).distinct().order_by("-competence")
+        if c != str(comp)
+    ]
 
     # Ordem de leitura, nao alfabetica: primeiro o que consumi, depois o que
     # rateio, por ultimo o acerto do mes passado.
@@ -340,12 +409,19 @@ def _melhor_janela(condominium) -> dict | None:
 
     # So faz sentido sugerir horario noturno: e quando o carro esta na garagem.
     noturnas = [(h, contagem[h]) for h in list(range(18, 24)) + list(range(0, 7))]
+    # Amostra pequena nao sustenta recomendacao. Sugerir horario com base em
+    # duas ou tres recargas seria achismo com cara de estatistica.
+    if sum(n for _, n in noturnas) < MIN_SESSOES_PARA_SUGERIR:
+        return None
+
     melhor = min(noturnas, key=lambda t: t[1])
     pior = max(noturnas, key=lambda t: t[1])
     return {
         "hora": melhor[0],
+        "hora_texto": _hora_humana(melhor[0]),
         "sessoes": melhor[1],
         "pior_hora": pior[0],
+        "pior_hora_texto": _hora_humana(pior[0]),
         "pior_sessoes": pior[1],
     }
 

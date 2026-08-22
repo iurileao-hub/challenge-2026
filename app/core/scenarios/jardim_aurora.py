@@ -67,8 +67,16 @@ def _dt(text: str) -> datetime:
     return datetime.strptime(text, "%Y-%m-%d %H:%M").replace(tzinfo=BRT)
 
 
-def build_jardim_aurora() -> dict:
-    """Monta o cenario completo e devolve os objetos que os testes usam."""
+def build_jardim_aurora(*, extra_residents: bool = False) -> dict:
+    """Monta o cenario completo e devolve os objetos que os testes usam.
+
+    `extra_residents=True` cadastra moradores e credenciais nas outras 9
+    unidades aderentes. Eles nao tem sessao em junho -- e por isso os testes de
+    aceitacao continuam exatos -- mas dao ao gerador sintetico populacao
+    suficiente para os meses anteriores, que e o que a IA precisa para ter o que
+    aprender. O default e `False` para que o teste do dossie rode sobre
+    exatamente o cenario do dossie.
+    """
     condo = Condominium.objects.create(
         name="Residencial Jardim Aurora",
         utility_name="Enel SP",
@@ -171,6 +179,9 @@ def build_jardim_aurora() -> dict:
             applied_tariff_kwh=PRICE_KWH,
         )
 
+    if extra_residents:
+        _add_extra_residents(condo, units, creds)
+
     return {
         "condominium": condo,
         "units": units,
@@ -181,3 +192,42 @@ def build_jardim_aurora() -> dict:
         "users": {"ana": ana, "bruno": bruno, "carla": carla, "davi": davi, "gestor": gestor},
         "enrolled_labels": enrolled_labels,
     }
+
+
+EXTRA_RESIDENTS = [
+    ("12", "Elisa Prado", "BYD Dolphin Mini", "38.00", "rfid"),
+    ("21", "Fabio Nunes", "Renault Kwid E-Tech", "26.80", "app"),
+    ("45", "Gisela Amorim", "Volvo EX40", "69.00", "rfid"),
+    ("58", "Heitor Sampaio", "BYD Song Plus", "71.80", "app"),
+    ("63", "Ines Barreto", "GWM Ora 03", "48.00", "rfid"),
+    ("87", "Joao Vilela", "Chevrolet Bolt", "65.00", "app"),
+    ("91", "Kelly Andrade", "Fiat 500e", "42.00", "rfid"),
+    ("102", "Lucas Tavares", "BYD Seal", "82.50", "app"),
+    ("110", "Marina Coelho", "JAC E-JS1", "30.20", "rfid"),
+]
+
+
+def _add_extra_residents(condo, units, creds):
+    """Moradores das demais unidades aderentes.
+
+    Sem sessao em junho de proposito: o mes ficticio do dossie tem tres
+    unidades consumidoras, e o teste de aceitacao afere exatamente isso.
+    """
+    for i, (label, nome, modelo, bateria, tipo) in enumerate(EXTRA_RESIDENTS):
+        primeiro = nome.split()[0].lower()
+        user = AppUser.objects.create(
+            name=nome, email=f"{primeiro}@jardimaurora.test", unit=units[label]
+        )
+        tag = f"{'RFID' if tipo == 'rfid' else 'APP'}-{primeiro.upper()}"
+        creds[tag] = Credential.objects.create(
+            user=user,
+            kind=Credential.Kind.RFID if tipo == "rfid" else Credential.Kind.APP,
+            auth_tag=tag,
+            valid_from=date(2026, 1, 1),
+        )
+        Vehicle.objects.create(
+            user=user,
+            plate=f"XYZ{i}{chr(65 + i)}{i}{i}",
+            model=modelo,
+            battery_capacity_kwh=Decimal(bateria),
+        )

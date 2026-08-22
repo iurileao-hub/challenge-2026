@@ -33,3 +33,28 @@ Os dados da ABVE/Tupi Mobilidade (emplacamentos anuais, rede de recarga, frota p
 | Arquivo | No repo? | Conteúdo | Origem |
 |---|---|---|---|
 | `pesquisa_challenge.csv` | **Não** (contém dado pessoal) | 12 respostas do survey estruturado sobre o instrumento P1–P15 do [roteiro](../docs/entrevistas/roteiro.md), aplicado via Google Forms entre 10 e 12/06/2026 | Exportação do Google Forms. Mantido **fora do repositório** porque um respondente deixou contato pessoal num campo opcional (LGPD) — excluído por `data/*` no `.gitignore`. Os insights curados e anonimizados (`R1`–`R12`) estão em [`docs/frente-1-contexto.md`](../docs/frente-1-contexto.md), seção "Opção B"; a planilha bruta fica disponível sob solicitação à equipe |
+
+## Sprint 2 — dataset de calibração do gerador sintético
+
+**`asensio_ev_workplace_charging.tab`** (447 KB, não versionado — reproduza com o comando abaixo)
+
+Depósito **primário** do dataset que o enunciado sugeriu via Kaggle: Harvard Dataverse,
+`doi:10.7910/DVN/QF1PMO`, arquivo `ev_workplace_charging_data.tab`, versão 4, licença **CC0 1.0**.
+São as 3.395 sessões reais de 85 usuários em 105 estações (18/11/2014 a 04/10/2015) publicadas em
+Asensio, Lawson & Apablaza, *Scientific Data* 8:168 (2021), DOI 10.1038/s41597-021-00956-1.
+
+```
+curl -sSL -o data/asensio_ev_workplace_charging.tab \
+  https://dataverse.harvard.edu/api/access/datafile/4491950
+```
+
+Acessado em 22/08/2026; contagem de linhas conferida contra as 3.395 sessões declaradas no artigo.
+
+Optamos pelo Dataverse em vez do reempacotamento no Kaggle por dois motivos: é a fonte primária
+(regra 1 do projeto) e o download é reprodutível sem credencial — a API do Kaggle passou a negar
+o escopo `datasets.get` para tokens do tipo `KGA...`, o que tornaria o passo não reproduzível por
+quem clonasse o repositório.
+
+Os parâmetros derivados deste arquivo ficam versionados em
+`app/ingestion/calibration_params.json`, com a proveniência embutida no próprio JSON;
+o script que os deriva é `app/ingestion/calibration.py` (`python -m ingestion.calibration`).

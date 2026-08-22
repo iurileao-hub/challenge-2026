@@ -15,3 +15,11 @@ __pycache__/
 CLAUDE.md
 entrega-sprint1.txt
 docs/superpowers/
+
+# Sprint 2 — aplicacao
+app/.venv/
+app/.env
+app/staticfiles/
+app/*.log
+.pytest_cache/
+*.pyc

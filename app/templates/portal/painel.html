@@ -24,6 +24,26 @@ qualquer numero: essa e a pergunta com que o sindico abre o sistema.{% endcommen
   </div>
   <a class="botao" href="#auditoria">Ver e decidir</a>
 </div>
+{% elif em_auditoria %}
+{% comment %}Estado do meio, e ele existe de verdade: a anomalia ja foi
+decidida como REAL, entao sai da fila -- mas a fatura continua retida ate o
+caso se resolver. Tratar "fila vazia" como "nada pendente" seria a tela
+dizendo que esta tudo certo enquanto o dinheiro de alguem esta segurado.{% endcomment %}
+<div class="faixa-estado pendente">
+  <div class="icone" aria-hidden="true">🔒</div>
+  <div class="texto">
+    <div class="titulo">
+      {{ em_auditoria }} fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }}
+    </div>
+    <div class="detalhe">
+      Você já revisou e confirmou o problema{{ em_auditoria|pluralize:"s" }}
+      {% if unidades_retidas %}da{{ unidades_retidas|pluralize:"s" }} unidade{{ unidades_retidas|pluralize:"s" }}
+      {% for u in unidades_retidas %}{{ u }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.
+      A cobrança segue segurada até o caso se resolver. As outras faturas de
+      {{ competencia }} estão prontas para fechar.
+    </div>
+  </div>
+</div>
 {% else %}
 <div class="faixa-estado">
   <div class="icone" aria-hidden="true">✓</div>
@@ -113,8 +133,15 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
   </p>
   {% else %}
   <p class="vazio" style="padding-left:0">
-    Nenhuma anomalia aberta. Todas as {{ sessoes_mes }} recargas de {{ competencia }} passaram
-    na verificação automática e nenhuma fatura ficou retida.
+    {% if em_auditoria %}
+      Nada aguarda decisão sua. A{{ em_auditoria|pluralize:"s" }} {{ em_auditoria }}
+      fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }} continua{{ em_auditoria|pluralize:"m" }}
+      segurada{{ em_auditoria|pluralize:"s" }} porque você confirmou o problema, e só sai
+      dessa situação quando o caso se resolver.
+    {% else %}
+      Nenhuma anomalia aberta. Todas as {{ sessoes_mes }} recargas de {{ competencia }} passaram
+      na verificação automática e nenhuma fatura ficou retida.
+    {% endif %}
   </p>
   {% endif %}
 </div>

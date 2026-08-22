@@ -31,7 +31,7 @@ class Condominium(models.Model):
     name = models.TextField("nome")
     utility_name = models.TextField("distribuidora")
     declared_power_kw = models.DecimalField(
-        "potencia declarada (kW)",
+        "potência declarada (kW)",
         max_digits=7,
         decimal_places=2,
         validators=[MinValueValidator(0)],
@@ -49,8 +49,8 @@ class Condominium(models.Model):
 
     class Meta:
         db_table = "condominium"
-        verbose_name = "condominio"
-        verbose_name_plural = "condominios"
+        verbose_name = "condomínio"
+        verbose_name_plural = "condomínios"
 
     def __str__(self):
         return self.name
@@ -62,10 +62,10 @@ class Unit(models.Model):
     condominium = models.ForeignKey(
         Condominium, on_delete=models.PROTECT, related_name="units"
     )
-    label = models.TextField("identificacao")
+    label = models.TextField("identificação")
     block = models.TextField("bloco", null=True, blank=True)
     ideal_fraction = models.DecimalField(
-        "fracao ideal",
+        "fração ideal",
         max_digits=8,
         decimal_places=6,
         null=True,
@@ -96,13 +96,13 @@ class ProgramEnrollment(models.Model):
     """
 
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="enrollments")
-    start_date = models.DateField("inicio da adesao")
-    end_date = models.DateField("fim da adesao", null=True, blank=True)
+    start_date = models.DateField("início da adesão")
+    end_date = models.DateField("fim da adesão", null=True, blank=True)
 
     class Meta:
         db_table = "program_enrollment"
-        verbose_name = "adesao ao programa"
-        verbose_name_plural = "adesoes ao programa"
+        verbose_name = "adesão ao programa"
+        verbose_name_plural = "adesões ao programa"
         constraints = [
             models.CheckConstraint(
                 condition=Q(end_date__isnull=True) | Q(end_date__gte=F("start_date")),
@@ -122,7 +122,7 @@ class AppUser(models.Model):
 
     class Role(models.TextChoices):
         RESIDENT = "resident", "Morador"
-        MANAGER = "manager", "Gestor/sindico"
+        MANAGER = "manager", "Gestor/síndico"
         VISITOR = "visitor", "Visitante"
 
     name = models.TextField("nome")
@@ -148,8 +148,8 @@ class AppUser(models.Model):
 
     class Meta:
         db_table = "app_user"
-        verbose_name = "usuario"
-        verbose_name_plural = "usuarios"
+        verbose_name = "usuário"
+        verbose_name_plural = "usuários"
         constraints = [
             models.CheckConstraint(
                 condition=Q(role__in=["resident", "manager", "visitor"]),
@@ -176,7 +176,7 @@ class Credential(models.Model):
     """
 
     class Kind(models.TextChoices):
-        RFID = "rfid", "Cartao RFID"
+        RFID = "rfid", "Cartão RFID"
         APP = "app", "Conta no app"
 
     class Status(models.TextChoices):
@@ -194,8 +194,8 @@ class Credential(models.Model):
         help_text="UID do cartao ou id da conta -- e o `auth_id` que o "
         "carregador reporta.",
     )
-    status = models.TextField("situacao", choices=Status.choices, default=Status.ACTIVE)
-    valid_from = models.DateField("valida desde")
+    status = models.TextField("situação", choices=Status.choices, default=Status.ACTIVE)
+    valid_from = models.DateField("válida desde")
 
     class Meta:
         db_table = "credential"
@@ -228,7 +228,7 @@ class Vehicle(models.Model):
 
     class Meta:
         db_table = "vehicle"
-        verbose_name = "veiculo"
+        verbose_name = "veículo"
 
     def __str__(self):
         return f"{self.model} ({self.plate})"
@@ -239,19 +239,19 @@ class ChargePoint(models.Model):
         Condominium, on_delete=models.PROTECT, related_name="charge_points"
     )
     serial_number = models.TextField(
-        "numero de serie",
+        "número de série",
         unique=True,
         help_text="E o `charge_point_id` do contrato da Frente 2 (o `sn` do SEMS).",
     )
     model = models.TextField("modelo")
-    location = models.TextField("localizacao")
+    location = models.TextField("localização")
     rated_power_kw = models.DecimalField(
-        "potencia nominal (kW)",
+        "potência nominal (kW)",
         max_digits=6,
         decimal_places=2,
         help_text="Denominador da razao kWh/hora usada na deteccao de anomalias.",
     )
-    commissioned_at = models.DateField("em operacao desde")
+    commissioned_at = models.DateField("em operação desde")
 
     class Meta:
         db_table = "charge_point"
@@ -274,7 +274,7 @@ class ChargingSession(models.Model):
 
     class Status(models.TextChoices):
         IN_PROGRESS = "in_progress", "Em andamento"
-        COMPLETED = "completed", "Concluida"
+        COMPLETED = "completed", "Concluída"
         INTERRUPTED = "interrupted", "Interrompida"
         FAULT = "fault", "Falha"
 
@@ -300,11 +300,11 @@ class ChargingSession(models.Model):
         "deliberada (decisao 2): se o cadastro for corrigido depois, a trilha "
         "de auditoria preserva o que o equipamento de fato disse.",
     )
-    auth_method = models.TextField("metodo", choices=AuthMethod.choices)
-    session_start = models.DateTimeField("inicio")
+    auth_method = models.TextField("método", choices=AuthMethod.choices)
+    session_start = models.DateTimeField("início")
     session_end = models.DateTimeField("fim", null=True, blank=True)
     meter_start = models.DecimalField(
-        "medidor no inicio (kWh)", max_digits=12, decimal_places=3
+        "medidor no início (kWh)", max_digits=12, decimal_places=3
     )
     meter_stop = models.DecimalField(
         "medidor no fim (kWh)",
@@ -323,9 +323,9 @@ class ChargingSession(models.Model):
         help_text="E o `kwh_s` da formula de rateio.",
     )
     max_power_kw = models.DecimalField(
-        "potencia maxima (kW)", max_digits=6, decimal_places=2, null=True, blank=True
+        "potência máxima (kW)", max_digits=6, decimal_places=2, null=True, blank=True
     )
-    status = models.TextField("situacao", choices=Status.choices)
+    status = models.TextField("situação", choices=Status.choices)
     stop_reason = models.TextField(
         "motivo do encerramento",
         null=True,
@@ -334,7 +334,7 @@ class ChargingSession(models.Model):
         "EmergencyStop...",
     )
     measurement_source = models.TextField(
-        "origem da medicao",
+        "origem da medição",
         choices=MeasurementSource.choices,
         default=MeasurementSource.CLOUD,
     )
@@ -359,8 +359,8 @@ class ChargingSession(models.Model):
 
     class Meta:
         db_table = "charging_session"
-        verbose_name = "sessao de recarga"
-        verbose_name_plural = "sessoes de recarga"
+        verbose_name = "sessão de recarga"
+        verbose_name_plural = "sessões de recarga"
         indexes = [
             models.Index(fields=["charge_point", "session_start"]),
             models.Index(fields=["credential", "session_start"]),
@@ -412,7 +412,7 @@ class TelemetryReading(models.Model):
     class Kind(models.TextChoices):
         METER_VALUE = "meter_value", "Leitura de medidor"
         HEARTBEAT = "heartbeat", "Heartbeat"
-        STATUS_CHANGE = "status_change", "Mudanca de estado"
+        STATUS_CHANGE = "status_change", "Mudança de estado"
 
     class State(models.TextChoices):
         DISCONNECTED = "disconnected", "Desconectado"
@@ -435,13 +435,13 @@ class TelemetryReading(models.Model):
     kind = models.TextField("tipo", choices=Kind.choices)
     state = models.TextField("estado", choices=State.choices, null=True, blank=True)
     power_kw = models.DecimalField(
-        "potencia (kW)", max_digits=6, decimal_places=2, null=True, blank=True
+        "potência (kW)", max_digits=6, decimal_places=2, null=True, blank=True
     )
     energy_kwh_total = models.DecimalField(
         "medidor acumulado (kWh)", max_digits=12, decimal_places=3, null=True, blank=True
     )
     measurement_source = models.TextField(
-        "origem da medicao",
+        "origem da medição",
         choices=MeasurementSource.choices,
         default=MeasurementSource.CLOUD,
     )
@@ -475,7 +475,7 @@ class TariffPeriod(models.Model):
         Condominium, on_delete=models.CASCADE, related_name="tariff_periods"
     )
     price_kwh = models.DecimalField(
-        "tarifa provisoria (R$/kWh)",
+        "tarifa provisória (R$/kWh)",
         max_digits=8,
         decimal_places=4,
         help_text="Provisoria de repasse (decisao 5). O efetivo entra depois, "
@@ -495,12 +495,12 @@ class TariffPeriod(models.Model):
     )
     assembly_ref = models.TextField("ata de assembleia", null=True, blank=True)
     valid_from = models.DateField("vigente desde")
-    valid_to = models.DateField("vigente ate", null=True, blank=True)
+    valid_to = models.DateField("vigente até", null=True, blank=True)
 
     class Meta:
         db_table = "tariff_period"
-        verbose_name = "vigencia de tarifa"
-        verbose_name_plural = "vigencias de tarifa"
+        verbose_name = "vigência de tarifa"
+        verbose_name_plural = "vigências de tarifa"
         constraints = [
             models.CheckConstraint(
                 condition=Q(valid_to__isnull=True) | Q(valid_to__gte=F("valid_from")),
@@ -525,7 +525,7 @@ class TariffReconciliation(models.Model):
     condominium = models.ForeignKey(
         Condominium, on_delete=models.CASCADE, related_name="reconciliations"
     )
-    competence = models.CharField("competencia apurada", max_length=7)
+    competence = models.CharField("competência apurada", max_length=7)
     utility_invoice_total = models.DecimalField(
         "total da fatura da distribuidora (R$)", max_digits=12, decimal_places=2
     )
@@ -536,7 +536,7 @@ class TariffReconciliation(models.Model):
         "tarifa efetiva (R$/kWh)", max_digits=8, decimal_places=4
     )
     provisional_price_kwh = models.DecimalField(
-        "tarifa provisoria vigente (R$/kWh)", max_digits=8, decimal_places=4
+        "tarifa provisória vigente (R$/kWh)", max_digits=8, decimal_places=4
     )
     delta_price_kwh = models.DecimalField(
         "delta (R$/kWh)",
@@ -545,15 +545,15 @@ class TariffReconciliation(models.Model):
         help_text="Efetiva menos provisoria. Pode ser negativa.",
     )
     settled_in_competence = models.CharField(
-        "liquidada na competencia", max_length=7,
+        "liquidada na competência", max_length=7,
         help_text="Competencia cuja fatura carrega as linhas de ajuste.",
     )
     created_at = models.DateTimeField("registrada em", auto_now_add=True)
 
     class Meta:
         db_table = "tariff_reconciliation"
-        verbose_name = "reconciliacao de tarifa"
-        verbose_name_plural = "reconciliacoes de tarifa"
+        verbose_name = "reconciliação de tarifa"
+        verbose_name_plural = "reconciliações de tarifa"
         constraints = [
             models.UniqueConstraint(
                 fields=["condominium", "competence"],
@@ -590,8 +590,8 @@ class Invoice(models.Model):
         blank=True,
         help_text="Fatura avulsa de visitante, fora do rateio.",
     )
-    competence = models.CharField("competencia", max_length=7)
-    status = models.TextField("situacao", choices=Status.choices, default=Status.DRAFT)
+    competence = models.CharField("competência", max_length=7)
+    status = models.TextField("situação", choices=Status.choices, default=Status.DRAFT)
     total_amount = models.DecimalField(
         "total (R$)",
         max_digits=10,
@@ -635,7 +635,7 @@ class InvoiceLine(models.Model):
     da Opcao A), nao o total. Arredondar so no fim mudaria centavos."""
 
     class Kind(models.TextChoices):
-        SESSION = "session", "Sessao de recarga"
+        SESSION = "session", "Sessão de recarga"
         AVAILABILITY_FEE = "availability_fee", "Taxa de disponibilidade"
         TARIFF_ADJUSTMENT = "tariff_adjustment", "Ajuste de tarifa"
 
@@ -655,7 +655,7 @@ class InvoiceLine(models.Model):
         null=True,
         blank=True,
     )
-    description = models.TextField("descricao")
+    description = models.TextField("descrição")
     energy_kwh = models.DecimalField(
         "energia (kWh)", max_digits=9, decimal_places=3, null=True, blank=True
     )
@@ -698,9 +698,9 @@ class AnomalyFlag(models.Model):
     class Category(models.TextChoices):
         CONSUMPTION = "consumption", "Consumo"
         IDLE = "idle", "Ociosidade"
-        POWER_DEGRADATION = "power_degradation", "Degradacao de potencia"
-        METERING = "metering", "Medicao"
-        HEALTH = "health", "Saude do ponto"
+        POWER_DEGRADATION = "power_degradation", "Degradação de potência"
+        METERING = "metering", "Medição"
+        HEALTH = "health", "Saúde do ponto"
 
     class Status(models.TextChoices):
         OPEN = "open", "Aberta"
@@ -724,7 +724,7 @@ class AnomalyFlag(models.Model):
     )
     category = models.TextField("categoria", choices=Category.choices)
     explanation = models.TextField(
-        "explicacao",
+        "explicação",
         help_text='Legivel por humano: "consumo 4x o padrao da credencial".',
     )
     detector = models.TextField(
@@ -734,7 +734,7 @@ class AnomalyFlag(models.Model):
         "`isolation_forest` (fase 2).",
     )
     score = models.FloatField("escore", null=True, blank=True)
-    status = models.TextField("situacao", choices=Status.choices, default=Status.OPEN)
+    status = models.TextField("situação", choices=Status.choices, default=Status.OPEN)
     reviewed_by_user = models.ForeignKey(
         AppUser,
         on_delete=models.SET_NULL,

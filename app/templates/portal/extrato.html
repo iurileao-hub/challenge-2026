@@ -1,0 +1,107 @@
+{% extends "portal/base.html" %}
+{% block titulo %}Minha fatura — EV ChargeOps{% endblock %}
+{% block conteudo %}
+
+<h1>Unidade {{ unidade.label }}</h1>
+<p class="sub">{{ app_user.name }} · competência {{ competencia }}</p>
+
+{% if fatura %}
+<div class="grade n3">
+  <div class="cartao metrica">
+    <div class="rotulo">Total da fatura</div>
+    <div class="valor"><small>R$</small> {{ fatura.total_amount|floatformat:2 }}</div>
+    <div class="nota">
+      {% if fatura.status == 'under_review' %}<span class="selo aviso">em auditoria</span>
+      {% elif fatura.status == 'closed' %}<span class="selo ok">fechada</span>
+      {% else %}<span class="selo neutro">{{ fatura.get_status_display }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="cartao metrica">
+    <div class="rotulo">Energia consumida</div>
+    <div class="valor">{{ kwh_total|floatformat:3 }} <small>kWh</small></div>
+    <div class="nota">em {{ n_sessoes }} sess{{ n_sessoes|pluralize:"ão,ões" }}</div>
+  </div>
+  {% if melhor_janela %}
+  <div class="cartao metrica">
+    <div class="rotulo">Melhor janela para recarregar</div>
+    <div class="valor">{{ melhor_janela.hora }}h</div>
+    <div class="nota">
+      {{ melhor_janela.sessoes }} sess{{ melhor_janela.sessoes|pluralize:"ão,ões" }}
+      nos últimos 90 dias, contra {{ melhor_janela.pior_sessoes }} às {{ melhor_janela.pior_hora }}h
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Extrato — como este valor foi calculado</h2>
+  <table>
+    <tr>
+      <th>Descrição</th>
+      <th class="num">kWh</th>
+      <th class="num">R$/kWh</th>
+      <th class="num">Valor</th>
+      <th></th>
+    </tr>
+    {% for l in linhas %}
+    <tr class="{% if l.flagged_for_audit %}linha-auditoria{% endif %}">
+      <td>
+        {{ l.description }}
+        {% if l.flagged_for_audit %}
+          <div style="font-size:12.5px;color:var(--warn);margin-top:3px">
+            Esta linha está em auditoria — o síndico revisa antes do fechamento.
+          </div>
+        {% endif %}
+      </td>
+      <td class="num">{% if l.energy_kwh %}{{ l.energy_kwh|floatformat:3 }}{% else %}—{% endif %}</td>
+      <td class="num">{% if l.unit_price_kwh %}{{ l.unit_price_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+      <td class="num">{{ l.amount|floatformat:2 }}</td>
+      <td class="num">
+        {% if l.kind == 'session' %}
+        <details>
+          <summary style="cursor:pointer;font-size:12.5px;color:var(--ink-soft)">contestar</summary>
+          <form method="post" action="{% url 'contestar' l.id %}" style="margin-top:8px;text-align:left;width:230px">
+            {% csrf_token %}
+            <label for="motivo{{ l.id }}">Motivo</label>
+            <textarea id="motivo{{ l.id }}" name="motivo" rows="2" placeholder="Ex.: não usei o carregador neste dia"></textarea>
+            <button type="submit" class="primario" style="margin-top:6px">Enviar contestação</button>
+          </form>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    <tr class="total">
+      <td>Total da competência {{ competencia }}</td>
+      <td class="num"></td><td class="num"></td>
+      <td class="num">{{ fatura.total_amount|floatformat:2 }}</td>
+      <td></td>
+    </tr>
+  </table>
+</div>
+
+<p class="rodape-nota">
+  A energia é cobrada ao custo de repasse da distribuidora, sem margem. A taxa de disponibilidade
+  é dividida igualmente entre as unidades aderentes ao programa e remunera a infraestrutura mantida
+  à disposição, não o uso — por isso ela aparece mesmo em meses sem recarga.
+  Quando a conta de luz do condomínio chega, a diferença entre a tarifa provisória e a efetiva
+  entra como uma linha de ajuste explicada na fatura seguinte, para mais ou para menos.
+</p>
+
+{% else %}
+<div class="cartao">
+  <p style="color:var(--ink-soft);margin:0">
+    Não há fatura emitida para a competência {{ competencia }}.
+  </p>
+</div>
+{% endif %}
+
+{% if competencias %}
+<div class="cartao">
+  <h2>Outras competências</h2>
+  {% for c in competencias %}
+    <a class="botao" href="{% url 'extrato' %}?competencia={{ c }}">{{ c }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

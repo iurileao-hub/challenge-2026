@@ -1,0 +1,27 @@
+{% extends "portal/base.html" %}
+{% block titulo %}Entrar — EV ChargeOps{% endblock %}
+{% block conteudo %}
+<div class="entrar">
+  <div class="cartao">
+    <h1>EV ChargeOps</h1>
+    <p class="sub">Gestão de recarga compartilhada</p>
+    {% if form.errors %}<div class="alerta critico">Usuário ou senha inválidos.</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="campo">
+        <label for="id_username">Usuário</label>
+        {{ form.username }}
+      </div>
+      <div class="campo">
+        <label for="id_password">Senha</label>
+        {{ form.password }}
+      </div>
+      <button type="submit" class="primario">Entrar</button>
+    </form>
+    <p class="dica">
+      Demonstração — senha <code>chargeops</code>.<br>
+      <strong>sindica</strong> (gestora do condomínio) · <strong>ana</strong>, <strong>carla</strong>, <strong>davi</strong> (moradores)
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -36,17 +36,28 @@ class SessionFeatures:
     energy_over_battery: float  # > 1 e fisicamente impossivel
     meter_consistent: bool
     second_half_power_ratio: float  # potencia da 2a metade / 1a metade
+    has_telemetry: bool = True      # False = nao ha base para julgar ociosidade
 
 
 def _charging_end(session: ChargingSession):
     """Ultimo instante com potencia > 0 -- a fronteira entre carregar e ocupar
     a vaga. Vem da telemetria, nao da sessao: e a diferenca entre o que o
-    equipamento fez e o que o usuario declarou."""
+    equipamento fez e o que o usuario declarou.
+
+    Devolve `(instante, houve_telemetria)`. A segunda parte importa mais do que
+    parece: **ausencia de telemetria nao e evidencia de ociosidade**. Um
+    carregador que nao reporta MeterValues e caso comum -- o proprio HCA G2 so
+    fala Modbus TCP -- e tratar silencio como prova acusaria o morador de
+    ocupar a vaga por um defeito do equipamento. Sem base, o detector se abstem.
+    """
+    tem_leitura = TelemetryReading.objects.filter(session=session).exists()
+    if not tem_leitura:
+        return session.session_end or session.session_start, False
     last = (
         TelemetryReading.objects.filter(session=session, power_kw__gt=0)
         .aggregate(last=Max("ts"))["last"]
     )
-    return last or session.session_start
+    return (last or session.session_start), True
 
 
 def _half_power_ratio(session: ChargingSession) -> float:
@@ -75,7 +86,7 @@ def extract(sessions) -> list[SessionFeatures]:
     for s in sessions:
         local = s.session_start.astimezone(tz)
         plugged = s.duration_hours or 0.0
-        charge_end = _charging_end(s)
+        charge_end, tem_telemetria = _charging_end(s)
         charging = max((charge_end - s.session_start).total_seconds() / 3600, 0.0)
         energy = float(s.energy_kwh)
         vehicles = list(s.credential.user.vehicles.all()) if s.credential else []
@@ -105,6 +116,7 @@ def extract(sessions) -> list[SessionFeatures]:
                 energy_over_battery=(energy / capacity if capacity > 0 else 0.0),
                 meter_consistent=meter_ok,
                 second_half_power_ratio=_half_power_ratio(s),
+                has_telemetry=tem_telemetria,
             )
         )
     return out

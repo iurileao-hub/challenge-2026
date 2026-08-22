@@ -111,7 +111,7 @@ def test_regra_pega_energia_acima_da_bateria(cenario):
                   use_isolation_forest=False)
     flag = AnomalyFlag.objects.get(session=s, category="consumption")
 
-    assert "impossivel" in flag.explanation
+    assert "impossível" in flag.explanation
     assert "82" in flag.explanation          # cita a capacidade cadastrada
     assert flag.detector == "rule"
     assert flag.status == AnomalyFlag.Status.OPEN
@@ -139,7 +139,7 @@ def test_regra_pega_ociosidade_com_base_na_telemetria(cenario):
                   use_isolation_forest=False)
     flag = AnomalyFlag.objects.get(session=s, category="idle")
 
-    assert "conectado apos concluir" in flag.explanation
+    assert "conectado após concluir" in flag.explanation
     assert s.duration_hours - 1 > IDLE_HOURS_THRESHOLD
 
 
@@ -148,7 +148,7 @@ def test_regra_pega_leitura_perdida(cenario):
                   use_isolation_forest=False)
     flag = AnomalyFlag.objects.get(session=cenario["sessions"][1005], category="metering")
 
-    assert "ultima leitura periodica" in flag.explanation
+    assert "última leitura periódica" in flag.explanation
     assert "conservador" in flag.explanation
 
 

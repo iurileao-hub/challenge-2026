@@ -1,0 +1,35 @@
+{% load static %}<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}EV ChargeOps{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/chargeops.css' %}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#9889;</text></svg>">
+</head>
+<body>
+{% if user.is_authenticated %}
+<header class="topo">
+  <div class="marca">EV <span>ChargeOps</span></div>
+  <nav>
+    {% if e_gestor %}
+      <a href="{% url 'painel' %}" class="{% if pagina == 'painel' %}ativo{% endif %}">Painel</a>
+      <a href="{% url 'relatorio' %}" class="{% if pagina == 'relatorio' %}ativo{% endif %}">Relatório da assembleia</a>
+    {% else %}
+      <a href="{% url 'extrato' %}" class="{% if pagina == 'extrato' %}ativo{% endif %}">Minha fatura</a>
+    {% endif %}
+    <span class="quem">{{ user.get_full_name|default:user.username }}</span>
+    <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}
+      <button type="submit">Sair</button>
+    </form>
+  </nav>
+</header>
+{% endif %}
+<main>
+  {% if messages %}{% for m in messages %}
+    <div class="aviso-sistema">{{ m }}</div>
+  {% endfor %}{% endif %}
+  {% block conteudo %}{% endblock %}
+</main>
+</body>
+</html>

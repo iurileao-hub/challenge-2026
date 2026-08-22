@@ -167,14 +167,14 @@ def _session_description(session: ChargingSession) -> str:
     from billing.competence import condo_tz
 
     local = session.session_start.astimezone(condo_tz())
-    quem = session.credential.user.name if session.credential else "credencial nao resolvida"
-    base = f"Recarga {local.strftime('%d/%m %H:%M')} - {quem}"
+    quem = session.credential.user.name if session.credential else "credencial não resolvida"
+    base = f"Recarga {local.strftime('%d/%m %H:%M')} — {quem}"
     if session.status == ChargingSession.Status.INTERRUPTED:
-        base += f" - sessao interrompida ({session.stop_reason or 'motivo nao informado'})"
+        base += f" — sessão interrompida ({session.stop_reason or 'motivo não informado'})"
     elif session.status == ChargingSession.Status.FAULT:
-        base += f" - falha no ponto ({session.stop_reason or 'motivo nao informado'})"
+        base += f" — falha no ponto ({session.stop_reason or 'motivo não informado'})"
     if session.meter_stop is None:
-        base += " - leitura final perdida, cobrada a ultima leitura conhecida"
+        base += " — leitura final perdida, cobrada a última leitura conhecida"
     return base
 
 
@@ -279,9 +279,9 @@ def close_competence(
 
         if share:
             cota = availability_share(fee_total, n_enrolled, share)
-            desc = f"Taxa de disponibilidade ({comp_str}) - rateio entre {n_enrolled} unidades aderentes"
+            desc = f"Taxa de disponibilidade ({comp_str}) — rateio entre {n_enrolled} unidades aderentes"
             if not share.is_full_month:
-                desc += f" - pro rata de {share.days_enrolled}/{share.days_in_month} dias"
+                desc += f" — pro rata de {share.days_enrolled}/{share.days_in_month} dias"
             lines.append(
                 InvoiceLine(
                     invoice=invoice,
@@ -375,15 +375,15 @@ def _adjustment_line(condominium, unit, comp: Competence, invoice) -> InvoiceLin
         return None
 
     amount = round2(kwh * Decimal(rec.delta_price_kwh))
-    sinal = "Complemento" if rec.delta_price_kwh > 0 else "Devolucao"
+    sinal = "Complemento" if rec.delta_price_kwh > 0 else "Devolução"
     return InvoiceLine(
         invoice=invoice,
         kind=InvoiceLine.Kind.TARIFF_ADJUSTMENT,
         reconciliation=rec,
         description=(
-            f"{sinal} de tarifa referente a {rec.competence}: {kwh} kWh x "
+            f"{sinal} de tarifa referente a {rec.competence}: {kwh} kWh × "
             f"R$ {rec.delta_price_kwh}/kWh (efetiva R$ {rec.effective_price_kwh} "
-            f"menos provisoria R$ {rec.provisional_price_kwh})"
+            f"menos provisória R$ {rec.provisional_price_kwh})"
         ),
         energy_kwh=kwh,
         unit_price_kwh=rec.delta_price_kwh,

@@ -1,0 +1,144 @@
+{% extends "portal/base.html" %}
+{% block titulo %}Painel do gestor — EV ChargeOps{% endblock %}
+{% block conteudo %}
+
+<h1>{{ condo.name }}</h1>
+<p class="sub">Competência {{ competencia }} · {{ condo.utility_name }} · potência declarada da instalação {{ condo.declared_power_kw }} kW</p>
+
+<div class="grade n4">
+  <div class="cartao metrica">
+    <div class="rotulo">Energia no mês</div>
+    <div class="valor">{{ kwh_mes|floatformat:1 }} <small>kWh</small></div>
+    <div class="nota">{{ sessoes_mes }} sessões</div>
+  </div>
+  <div class="cartao metrica">
+    <div class="rotulo">Rateio do mês</div>
+    <div class="valor"><small>R$</small> {{ receita|floatformat:2 }}</div>
+    <div class="nota">{{ faturas }} faturas emitidas</div>
+  </div>
+  <div class="cartao metrica">
+    <div class="rotulo">Unidades aderentes</div>
+    <div class="valor">{{ aderentes }}</div>
+    <div class="nota">dividem a taxa de disponibilidade</div>
+  </div>
+  <div class="cartao metrica">
+    <div class="rotulo">Em auditoria</div>
+    <div class="valor">{{ em_auditoria }}</div>
+    <div class="nota">faturas retidas até revisão</div>
+  </div>
+</div>
+
+<div class="grade n2">
+  <div class="cartao">
+    <h2>Previsão de demanda — próximos 7 dias</h2>
+    <table>
+      <tr><th>Dia</th><th class="num">kWh previstos</th><th class="num">Sessões</th></tr>
+      {% for d in previsao.days %}
+      <tr>
+        <td>{{ d.day|date:"D d/m" }}</td>
+        <td class="num">{{ d.predicted_kwh|floatformat:1 }}</td>
+        <td class="num">{{ d.predicted_sessions|floatformat:1 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total"><td>Total</td><td class="num">{{ previsao.total_predicted_kwh|floatformat:1 }}</td><td></td></tr>
+    </table>
+    <div class="explicacao">
+      <strong>Método:</strong> {{ previsao.method }}.
+      {% if previsao.backtest_mae_kwh %}
+        Erro médio no backtest dos últimos 14 dias: <strong>{{ previsao.backtest_mae_kwh|floatformat:1 }} kWh/dia</strong>
+        (média por dia da semana: {{ previsao.baseline_mae_kwh|floatformat:1 }} kWh/dia).
+      {% endif %}
+      Treinado em {{ previsao.trained_on_days }} dias de histórico.
+    </div>
+    {% for a in previsao.alerts %}
+      <div class="alerta {% if a.severity == 'critical' %}critico{% endif %}">{{ a.message }}</div>
+    {% empty %}
+      <div class="alerta info">Nenhum alerta de saturação ou de limite de potência para o período.</div>
+    {% endfor %}
+  </div>
+
+  <div class="cartao">
+    <h2>Ocupação por hora do dia</h2>
+    <div class="barra">
+      {% for o in ocupacao %}
+        <div class="col {% if o.pct > 60 %}forte{% endif %}" style="height: {{ o.pct }}%" title="{{ o.hora }}h: {{ o.n }} sessões"></div>
+      {% endfor %}
+    </div>
+    <div class="eixo">
+      {% for o in ocupacao %}<span>{% if o.hora == 0 or o.hora == 6 or o.hora == 12 or o.hora == 18 %}{{ o.hora }}h{% endif %}</span>{% endfor %}
+    </div>
+
+    <h2 style="margin-top:22px">Saúde dos pontos</h2>
+    <table>
+      {% for p in pontos %}
+      <tr>
+        <td>
+          <strong>{{ p.ponto.model }}</strong><br>
+          <span style="font-size:12.5px;color:var(--ink-faint)">{{ p.ponto.location }} · {{ p.ponto.serial_number }}</span>
+        </td>
+        <td class="num">
+          {% if p.online %}<span class="selo ok">on-line</span>
+          {% else %}<span class="selo perigo">sem sinal</span>{% endif %}<br>
+          <span style="font-size:12.5px;color:var(--ink-faint)">
+            {{ p.sessoes_mes }} sessões · {{ p.kwh_mes|floatformat:1 }} kWh
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="cartao">
+  <h2>Fila de auditoria — {{ anomalias|length }} anomalia{{ anomalias|length|pluralize:"s" }} aberta{{ anomalias|length|pluralize:"s" }}</h2>
+  <p class="sub" style="margin-bottom:16px">
+    Detectadas antes do fechamento da fatura. Nenhuma decisão é automática: a linha fica marcada
+    e a fatura retida até alguém decidir.
+  </p>
+  <table>
+    <tr>
+      <th>Quando</th><th>Origem</th><th>Categoria</th><th>O que foi detectado</th><th class="num">Decisão</th>
+    </tr>
+    {% for a in anomalias %}
+    <tr>
+      <td style="white-space:nowrap">
+        {% if a.session %}{{ a.session.session_start|date:"d/m H:i" }}{% else %}—{% endif %}
+      </td>
+      <td>
+        {% if a.session.credential %}
+          {{ a.session.credential.user.name }}<br>
+          <span style="font-size:12px;color:var(--ink-faint)">unidade {{ a.session.credential.user.unit.label }}</span>
+        {% else %}
+          {{ a.charge_point.serial_number|default:"ponto" }}
+        {% endif %}
+      </td>
+      <td><span class="selo {% if a.category == 'health' %}perigo{% else %}aviso{% endif %}">{{ a.get_category_display }}</span></td>
+      <td>
+        {{ a.explanation }}
+        <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">
+          detector: {{ a.detector }}{% if a.score %} · escore {{ a.score|floatformat:3 }}{% endif %}
+        </div>
+      </td>
+      <td class="num" style="white-space:nowrap">
+        <form method="post" action="{% url 'revisar_anomalia' a.id %}" class="inline">
+          {% csrf_token %}
+          <button type="submit" name="decisao" value="accepted">Confirmar</button>
+        </form>
+        <form method="post" action="{% url 'revisar_anomalia' a.id %}" class="inline">
+          {% csrf_token %}
+          <button type="submit" name="decisao" value="dismissed" class="perigo">Descartar</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" style="color:var(--ink-faint)">Nenhuma anomalia aberta.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<p class="rodape-nota">
+  A detecção roda antes do fechamento da fatura: a linha suspeita entra marcada e a fatura fica
+  em auditoria até revisão humana. A plataforma produz evidência; a decisão — inclusive a de
+  suspender credencial — é da assembleia.
+</p>
+{% endblock %}

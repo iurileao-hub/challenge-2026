@@ -61,10 +61,10 @@ def _rule_impossible_energy(f: SessionFeatures) -> Detection | None:
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="consumption",
             explanation=(
-                f"Sessao registrou {f.energy_kwh:.1f} kWh, {f.energy_over_battery:.0%} "
+                f"Sessão registrou {f.energy_kwh:.1f} kWh, {f.energy_over_battery:.0%} "
                 f"da capacidade da bateria cadastrada ({f.battery_capacity_kwh:.0f} kWh). "
-                "Acima de 100% e fisicamente impossivel numa unica recarga: "
-                "verificar medicao ou cadastro do veiculo."
+                "Acima de 100% é fisicamente impossível numa única recarga: "
+                "verificar medição ou cadastro do veículo."
             ),
         )
     return None
@@ -77,22 +77,29 @@ def _rule_consumption_outlier(f: SessionFeatures, median: float | None) -> Detec
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="consumption",
             explanation=(
-                f"Consumo de {f.energy_kwh:.1f} kWh e {f.energy_kwh / median:.1f}x a "
-                f"mediana historica desta credencial ({median:.1f} kWh)."
+                f"Consumo de {f.energy_kwh:.1f} kWh é {f.energy_kwh / median:.1f}x a "
+                f"mediana histórica desta credencial ({median:.1f} kWh)."
             ),
         )
     return None
 
 
 def _rule_idle(f: SessionFeatures) -> Detection | None:
-    """Vaga ocupada sem entregar energia -- o carro-tampao da Frente 1."""
+    """Vaga ocupada sem entregar energia -- o carro-tampao da Frente 1.
+
+    Exige telemetria. Sem MeterValues nao se sabe QUANDO a recarga terminou, e
+    a regra se cala: acusar por falta de dado seria punir o morador pelo
+    silencio do equipamento.
+    """
+    if not f.has_telemetry:
+        return None
     if f.idle_hours >= IDLE_HOURS_THRESHOLD:
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="idle",
             explanation=(
-                f"Veiculo permaneceu {f.idle_hours:.1f} h conectado apos concluir a "
+                f"Veículo permaneceu {f.idle_hours:.1f} h conectado após concluir a "
                 f"recarga (carregou {f.charging_hours:.1f} h de {f.plugged_hours:.1f} h "
-                "plugado). A vaga ficou indisponivel sem entregar energia."
+                "plugado). A vaga ficou indisponível sem entregar energia."
             ),
         )
     return None
@@ -104,9 +111,9 @@ def _rule_power_degradation(f: SessionFeatures) -> Detection | None:
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="power_degradation",
             explanation=(
-                f"Potencia da segunda metade da sessao caiu para "
-                f"{f.second_half_power_ratio:.0%} da primeira. Sinal de degradacao "
-                "de cabo, conector ou contator -- manutencao preventiva antes que "
+                f"Potência da segunda metade da sessão caiu para "
+                f"{f.second_half_power_ratio:.0%} da primeira. Sinal de degradação "
+                "de cabo, conector ou contator — manutenção preventiva antes que "
                 "vire falha."
             ),
         )
@@ -119,8 +126,8 @@ def _rule_metering(f: SessionFeatures, session: ChargingSession) -> Detection | 
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="metering",
             explanation=(
-                "Leitura final do medidor nao chegou. A cobranca usou a ultima "
-                f"leitura periodica conhecida ({f.energy_kwh:.3f} kWh) -- sempre o "
+                "Leitura final do medidor não chegou. A cobrança usou a última "
+                f"leitura periódica conhecida ({f.energy_kwh:.3f} kWh) — sempre o "
                 "valor mais conservador, nunca estimativa para cima."
             ),
         )
@@ -128,8 +135,8 @@ def _rule_metering(f: SessionFeatures, session: ChargingSession) -> Detection | 
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="metering",
             explanation=(
-                "Energia registrada na sessao nao confere com a diferenca das "
-                "leituras do medidor. Divergencia acima da tolerancia de 0,05 kWh."
+                "Energia registrada na sessão não confere com a diferença das "
+                "leituras do medidor. Divergência acima da tolerância de 0,05 kWh."
             ),
         )
     return None
@@ -165,8 +172,8 @@ def detect_point_health(condominium, since, until) -> list[Detection]:
                     explanation=(
                         f"Ponto {point.serial_number} ficou "
                         f"{worst.total_seconds() / 3600:.1f} h sem comunicar a partir "
-                        f"de {local:%d/%m %H:%M}. Indisponibilidade nao percebida pelo "
-                        "morador ate tentar usar."
+                        f"de {local:%d/%m %H:%M}. Indisponibilidade não percebida pelo "
+                        "morador até tentar usar."
                     ),
                 )
             )
@@ -218,7 +225,7 @@ def detect_isolation_forest(features: list[SessionFeatures], contamination: floa
         top = np.argsort(-z)[:2]
         motivos = ", ".join(
             f"{ISOLATION_FEATURES[j]}={df.iloc[i][ISOLATION_FEATURES[j]]:.2f} "
-            f"({z[j]:.1f} desvios da media)" for j in top
+            f"({z[j]:.1f} desvios da média)" for j in top
         )
         out.append(
             Detection(
@@ -226,8 +233,8 @@ def detect_isolation_forest(features: list[SessionFeatures], contamination: floa
                 charge_point_id=None,
                 category="consumption",
                 explanation=(
-                    f"Combinacao atipica de caracteristicas nesta sessao: {motivos}. "
-                    "Detectada por Isolation Forest sobre o historico do condominio."
+                    f"Combinação atípica de características nesta sessão: {motivos}. "
+                    "Detectada por Isolation Forest sobre o histórico do condomínio."
                 ),
                 detector="isolation_forest",
                 score=float(scores[i]),

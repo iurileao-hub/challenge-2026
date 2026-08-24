@@ -60,3 +60,13 @@ class Command(BaseCommand):
             "gabarito nao marca\n(ociosidade real, por exemplo) e que sao achados "
             "corretos, nao falsos positivos."
         ))
+        # Este comando gera cenario novo por cima do que estava no banco: as
+        # faturas somem e os logins do portal ficam orfaos, porque o vinculo
+        # entre conta de acesso e pessoa quem faz e o `seed_demo`. Quem roda
+        # isso antes de uma demonstracao encontra 404 em todas as telas e nao
+        # tem como adivinhar o motivo. Avisar aqui e mais barato que depurar.
+        self.stdout.write(self.style.NOTICE(
+            "\nO cenario de demonstracao foi substituido. Para restaurar o portal:\n"
+            "  python manage.py seed_demo --months 6 --reset\n"
+            "  python manage.py pipeline --reconciliar"
+        ))

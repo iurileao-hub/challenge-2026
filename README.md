@@ -1,6 +1,22 @@
 # EV ChargeOps — Enterprise Challenge 2026 (FIAP × GoodWe)
 
-Sprint 1 do Enterprise Challenge 2026: pesquisa e documentação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável.
+<p align="center">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="Django 5.2" src="https://img.shields.io/badge/Django-5.2-092E20?style=flat-square&logo=django&logoColor=white">
+  <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white">
+  <img alt="scikit-learn 1.9" src="https://img.shields.io/badge/scikit--learn-1.9-F7931E?style=flat-square&logo=scikitlearn&logoColor=white">
+  <img alt="pandas 3.0" src="https://img.shields.io/badge/pandas-3.0-150458?style=flat-square&logo=pandas&logoColor=white">
+</p>
+
+<p align="center">
+  <img alt="49 testes" src="https://img.shields.io/badge/testes-49%20passando-2ea44f?style=flat-square">
+  <img alt="14 entidades" src="https://img.shields.io/badge/esquema-14%20entidades-0f6b4f?style=flat-square">
+  <img alt="Recall da detecção: 100%" src="https://img.shields.io/badge/detecção%20de%20anomalias-recall%20100%25-0f6b4f?style=flat-square">
+  <img alt="Sprint 2 entregue" src="https://img.shields.io/badge/Sprint%202-entregue-2ea44f?style=flat-square">
+  <img alt="FIAP x GoodWe" src="https://img.shields.io/badge/FIAP-%C3%97%20GoodWe-ED145B?style=flat-square">
+</p>
+
+Enterprise Challenge 2026, Sprints 1 e 2: a pesquisa, o desenho e a implementação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável. A Sprint 1 produziu os três dossiês de pesquisa e o contrato de arquitetura; a Sprint 2 implementou a plataforma, que roda em [`app/`](app/).
 
 Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um dossiê completo em `docs/`, com método declarado, fontes verificadas e análise própria — aqui apresentamos as conclusões e decisões; o detalhe, a evidência e a justificativa estendida estão nos dossiês linkados.
 
@@ -22,6 +38,24 @@ Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um 
 | Iúri Leão de Almeida | RM570215 |
 | Márcio Francisco dos Santos Júnior | RM570758 |
 | Maria Sophia Domingues dos Santos | RM571209 |
+
+## Estrutura do repositório
+
+Onde encontrar cada coisa, e o que esperar de cada pasta.
+
+| Caminho | Conteúdo |
+|---|---|
+| [`README.md`](README.md) | Este arquivo: a síntese das três frentes de pesquisa, o desenho da solução e o resultado da implementação |
+| [`app/`](app/) | A plataforma implementada na Sprint 2 (Django + PostgreSQL). Instruções de instalação, roteiro de exploração e explicação da arquitetura interna no [README da aplicação](app/README.md) |
+| [`docs/frente-1-contexto.md`](docs/frente-1-contexto.md) | Dossiê da Frente 1: contexto de mercado, análise de concorrentes, pesquisa com usuários e análise de dados públicos |
+| [`docs/frente-2-regulatorio.md`](docs/frente-2-regulatorio.md) | Dossiê da Frente 2: mapeamento normativo a partir de texto oficial, especificação técnica do carregador e das APIs |
+| [`docs/frente-2-sems-plus-acesso.md`](docs/frente-2-sems-plus-acesso.md) | Registro da observação direta da plataforma SEMS+, com a planta real da FIAP |
+| [`docs/frente-3-arquitetura.md`](docs/frente-3-arquitetura.md) | Dossiê da Frente 3: arquitetura em quatro camadas, benchmark de modelos de rateio, papel da IA e o dicionário das 14 entidades |
+| [`docs/normas/`](docs/normas/) | Textos normativos oficiais preservados: REN ANEEL 1.000/2021, Lei 18.403/2026, IT-41 e portarias do CBPMESP, Lei municipal 17.336/2020 |
+| [`docs/entrevistas/`](docs/entrevistas/) | Roteiro e instrumento da pesquisa com usuários (Frente 1, Opção B) |
+| [`notebooks/frota_ev_brasil.ipynb`](notebooks/frota_ev_brasil.ipynb) | Análise reproduzível dos dados públicos: emplacamentos, distribuição da rede e razão veículos por ponto |
+| [`data/`](data/README.md) | Datasets e respostas brutas das chamadas de API. O README da pasta diz o que está versionado e como regenerar o que não está |
+| [`assets/`](assets/) | Diagrama de arquitetura (fonte Mermaid e PNG), gráficos do notebook e capturas da plataforma SEMS+ |
 
 ## O problema
 
@@ -139,6 +173,22 @@ O plano acima foi executado. O código está em [`app/`](app/), com instruções
 scikit-learn: as tecnologias que a Sprint 1 escolheu, sem substituição. O framework web ficou
 em **Django**, pela velocidade nas etapas de interface.
 
+Para ver a plataforma rodando, com PostgreSQL 13+ e [uv](https://docs.astral.sh/uv/) instalados (comandos de Linux; as variantes de macOS e Windows estão no [README da aplicação](app/README.md#2-como-rodar)):
+
+```bash
+sudo -u postgres psql -c "CREATE ROLE chargeops LOGIN PASSWORD 'chargeops_dev' CREATEDB;"
+sudo -u postgres psql -c "CREATE DATABASE chargeops OWNER chargeops;"
+cd app && uv sync && uv run python manage.py migrate
+uv run python manage.py seed_demo --months 6 --reset
+uv run python manage.py pipeline --reconciliar     # o ciclo inteiro, no terminal
+uv run python manage.py runserver                  # http://127.0.0.1:8000/entrar/
+```
+
+O penúltimo comando imprime o produto inteiro sem abrir o navegador, e termina nas três
+faturas do dossiê. Login `sindica` (gestora) ou `ana`, `carla`, `davi` (moradores), senha
+`chargeops` para todos. O passo a passo completo, o roteiro de exploração das telas e a
+solução de problemas estão no [README da aplicação](app/README.md).
+
 | # | Etapa do plano | Estado | Onde |
 |---|---|---|---|
 | 1 | Gerador de dados sintéticos | implementado, calibrado no dado real, com gabarito | `app/ingestion/generator.py` |
@@ -163,7 +213,7 @@ possível linha a linha.
 O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
-escrito meses antes do código, e não lidos da implementação. São 47 testes no total.
+escrito meses antes do código, e não lidos da implementação. São 49 testes no total.
 
 ### O que a implementação ensinou e a pesquisa não tinha visto
 

@@ -18,7 +18,15 @@
 
 Enterprise Challenge 2026, Sprints 1 e 2: a pesquisa, o desenho e a implementação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável. A Sprint 1 produziu os três dossiês de pesquisa e o contrato de arquitetura; a Sprint 2 implementou a plataforma, que roda em [`app/`](app/).
 
-Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um dossiê completo em `docs/`, com método declarado, fontes verificadas e análise própria — aqui apresentamos as conclusões e decisões; o detalhe, a evidência e a justificativa estendida estão nos dossiês linkados.
+> [!IMPORTANT]
+> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **50 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
+
+### Dois READMEs, dois propósitos
+
+| 📍 Entender o projeto | 🚀 Rodar a plataforma |
+|---|---|
+| **Você está aqui.** Este README traz o problema, a pesquisa das três frentes, o modelo de rateio, o papel da IA, o resultado da Sprint 2 e as fontes. | **Vá para [`app/README.md`](app/README.md).** Pré-requisitos no Linux, macOS e Windows, execução em cinco comandos, roteiro de exploração das telas, mapa de rotas e solução de problemas. |
+| As conclusões e as decisões ficam aqui; o detalhe, a evidência e a justificativa estendida estão nos dossiês de [`docs/`](docs/), cada um com método declarado e fontes verificadas. | Do clone à interface no navegador em cerca de cinco minutos, nos três sistemas operacionais. |
 
 ## TL;DR
 
@@ -26,7 +34,8 @@ Este README é a síntese do trabalho da equipe. Cada frente de pesquisa tem um 
 - **Tese:** o gargalo não é o hardware (carregador AC é commodity), é a **gestão**.
 - **Solução — EV ChargeOps:** sessão identificada por usuário + rateio por kWh medido, justo e auditável + IA operacional (previsão de pico, detecção de anomalia, simulação tarifária) sobre a telemetria, neutra de hardware via OCPP.
 - **Diferencial:** das cinco soluções de mercado analisadas, nenhuma oferece ao mesmo tempo rateio condominial nativo do Brasil, neutralidade de hardware (OCPP) e IA operacional — essa interseção vazia é o posicionamento.
-- **Entregue nesta Sprint 1:** três dossiês com fontes primárias verificadas, notebook de análise reproduzível, esquema de dados de 14 entidades e motor de rateio testado num mês fictício; a restrição real (sem acesso à API da GoodWe) foi convertida em decisão de arquitetura — ingestão plugável + tripé de dados.
+- **Entregue na Sprint 1:** três dossiês com fontes primárias verificadas, notebook de análise reproduzível, esquema de dados de 14 entidades e motor de rateio testado num mês fictício; a restrição real (sem acesso à API da GoodWe) foi convertida em decisão de arquitetura — ingestão plugável + tripé de dados.
+- **Entregue na Sprint 2:** a plataforma de verdade, nas seis etapas que a Sprint 1 planejou e na ordem planejada. Gateway de ingestão plugável, as 14 entidades migradas sem nenhum campo de emergência, motor de rateio com reconciliação em dois tempos, detecção de anomalias em duas fases com recall de 100% contra gabarito, previsão de 7 dias escolhida por medição, painel do gestor e portal do morador. Instruções de instalação em [`app/README.md`](app/README.md).
 
 ## Equipe
 

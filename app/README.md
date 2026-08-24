@@ -1,8 +1,14 @@
 # EV ChargeOps: aplicação (Sprint 2)
 
-Implementação da arquitetura definida na Sprint 1. O contrato está em
-[`../docs/frente-3-arquitetura.md`](../docs/frente-3-arquitetura.md); este diretório é a execução dele.
-A visão de produto, a pesquisa e as fontes estão no [README da raiz](../README.md).
+> [!TIP]
+> **Com pressa? Comece em [Pré-requisitos](#1-pré-requisitos) e siga até [Como rodar](#2-como-rodar).** São cinco comandos, e dá cerca de cinco minutos do clone à interface no navegador. O quarto comando imprime a plataforma inteira no terminal, sem abrir o navegador.
+
+### Dois READMEs, dois propósitos
+
+| 🚀 Rodar a plataforma | 📍 Entender o projeto |
+|---|---|
+| **Você está aqui.** Este é o manual da aplicação: como instalar nos três sistemas operacionais, como rodar, o que olhar em cada tela e o que fazer quando algo falha. | **Vá para o [README da raiz](../README.md).** É lá que estão o problema, a pesquisa das três frentes, o modelo de rateio, o papel da IA, o resultado da Sprint 2 e as fontes. |
+| A aplicação é a execução do contrato de arquitetura definido em [`../docs/frente-3-arquitetura.md`](../docs/frente-3-arquitetura.md). | As decisões desta implementação que valem explicação estão na [seção 11](#11-decisões-que-valem-explicação) desta página. |
 
 **Sumário**
 

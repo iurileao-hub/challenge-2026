@@ -376,6 +376,24 @@ def extrato(request):
         (Decimal(ln.energy_kwh) for ln in linhas if ln.kind == "session" and ln.energy_kwh),
         Decimal("0.000"),
     )
+    # Quem carregou. `descricao_amigavel` suprime o nome de proposito: na tela
+    # do proprio morador, repeti-lo em cada linha e ruido. Numa unidade com mais
+    # de uma pessoa credenciada (o caso do casal com dois veiculos) essa
+    # supressao apaga informacao: as recargas do outro ficam indistinguiveis
+    # das proprias, e a fatura e uma so. Entao o rotulo aparece apenas quando
+    # ha mais de um credenciado na unidade.
+    credenciados = {
+        ln.session.credential.user_id
+        for ln in linhas
+        if ln.kind == "session" and ln.session_id and ln.session.credential_id
+    }
+    if len(credenciados) > 1:
+        for ln in linhas:
+            if ln.kind == "session" and ln.session_id and ln.session.credential_id:
+                cred = ln.session.credential
+                ln.quem = cred.user.name
+                ln.como = cred.get_kind_display()
+
     melhor_janela = _melhor_janela(au.unit.condominium)
     return render(request, "portal/extrato.html", {
         "kwh_total": kwh_total,

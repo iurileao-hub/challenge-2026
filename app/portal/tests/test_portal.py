@@ -221,3 +221,22 @@ def test_total_do_relatorio_bate_com_a_soma_das_faturas(client, cenario):
     assert "327,30" in corpo     # 147,30 de energia + 180,00 de disponibilidade
     assert "147,30" in corpo
     assert "180,00" in corpo
+
+
+def test_extrato_de_unidade_compartilhada_diz_quem_carregou(client, cenario):
+    """A unidade 72 tem duas pessoas credenciadas (Ana no RFID, Bruno no app) e
+    uma fatura so. Sem o rotulo, a recarga do Bruno fica indistinguivel das da
+    Ana, e o caso excepcional 'dois veiculos na mesma unidade' some da tela."""
+    entrar(client, "ana")
+    corpo = client.get("/extrato/").content.decode()
+    assert "Bruno Ribeiro" in corpo
+    assert "Ana Ribeiro" in corpo
+    assert "Conta no app" in corpo
+
+
+def test_extrato_de_unidade_individual_nao_repete_o_nome(client, cenario):
+    """A contrapartida: na unidade 34 so a Carla carrega, e repetir o nome dela
+    em cada linha da propria fatura e ruido. O rotulo e condicional, nao fixo."""
+    entrar(client, "carla")
+    corpo = client.get("/extrato/").content.decode()
+    assert "Iniciada por" not in corpo

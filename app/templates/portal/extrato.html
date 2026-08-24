@@ -61,6 +61,11 @@ sozinho deixa sem resposta a pergunta que mais importa: eu pago ou nao pago?{% e
       <tr class="{% if l.flagged_for_audit %}linha-auditoria{% endif %}">
         <td data-rotulo="O que foi cobrado" class="solo">
           {{ l.descricao_amigavel }}
+          {% if l.quem %}
+            <div class="quem-carregou">
+              Iniciada por <strong>{{ l.quem }}</strong> · {{ l.como }}
+            </div>
+          {% endif %}
           {% if l.flagged_for_audit %}
             <div style="font-size:12.5px;color:var(--warn);margin-top:5px">
               <strong>Esta recarga está em revisão.</strong> Cobramos pela última leitura

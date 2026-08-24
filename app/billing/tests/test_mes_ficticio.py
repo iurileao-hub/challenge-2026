@@ -10,7 +10,7 @@ fatura linha a linha usando somente as 14 entidades, sem migracao de
 emergencia, o contrato cumpriu seu papel.
 """
 
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal
 
 import pytest
 
@@ -100,17 +100,41 @@ def test_unidade_105_inclui_a_sessao_da_virada_do_mes(cenario, fechamento):
     ).exists()
 
 
-def test_arredondamento_e_half_up_e_nao_half_even(cenario, fechamento):
-    """A sessao 1006 da 11,250 x 0,7252 = 8,1585 exatamente.
+def test_a_linha_da_sessao_1006_arredonda_para_cima(cenario, fechamento):
+    """A sessao 1006 da 11,250 x 0,7252 = 8,1585 exatamente, e a linha cobra 8,16.
 
-    Half-up (a regra da Opcao A) -> 8,16. Half-even (o padrao do IEEE-754 e do
-    `round()` do Python) -> 8,15. O dossie escolheu este caso de proposito.
+    Este teste prova que o produto e calculado em precisao total e arredondado
+    depois, nao que half-up e half-even discordem aqui: 8,1585 nao e empate (a
+    fracao descartada e 0,85 do centavo), e as duas convencoes devolvem 8,16.
+    A escolha da convencao esta no teste seguinte, num valor que de fato separa.
     """
     linha = fatura(cenario, "105").lines.get(session=cenario["sessions"][1006])
 
     assert Decimal("11.250") * Decimal("0.7252") == Decimal("8.1585")
     assert linha.amount == Decimal("8.16")
-    assert linha.amount != Decimal("8.15")
+    # a mesma resposta pelas duas convencoes: e por isso que este caso nao
+    # serve para justificar a escolha da regra.
+    assert Decimal("8.1585").quantize(Decimal("0.01"), ROUND_HALF_UP) == Decimal("8.16")
+    assert Decimal("8.1585").quantize(Decimal("0.01"), ROUND_HALF_EVEN) == Decimal("8.16")
+
+
+def test_round2_e_half_up_no_valor_que_separa_as_convencoes(cenario):
+    """Com a tarifa de 0,7252, 12,500 kWh e o unico consumo da faixa de uso que
+    cai exatamente na metade de um centavo: 9,06500.
+
+    Ali a convencao decide sozinha o valor, e a regra da Opcao A e half-up. O
+    mesmo caso mostra por que dinheiro nao pode passar por `float`: 0,7252 nao
+    tem representacao binaria exata, o produto armazenado fica um fio abaixo do
+    empate e `round()` desce o centavo.
+    """
+    produto = Decimal("12.500") * Decimal("0.7252")
+    assert produto == Decimal("9.065000")
+
+    assert round2(produto) == Decimal("9.07")
+    assert produto.quantize(Decimal("0.01"), ROUND_HALF_EVEN) == Decimal("9.06")
+
+    # o mesmo calculo em ponto flutuante perde o centavo
+    assert round(12.500 * 0.7252, 2) == 9.06
 
 
 # --------------------------------------------------------------------------

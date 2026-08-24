@@ -1,5 +1,8 @@
 # Frente 3 — Arquitetura e IA
 
+> **Errata de 2026-08-24.** A primeira versão deste dossiê afirmava, na seção do mês fictício, que a sessão 1006 (11,250 × 0,7252 = 8,1585) era o caso que separava half-up de half-even, calculando 8,15 na segunda convenção. A afirmação está errada: 8,1585 não é empate e as duas convenções devolvem 8,16. A regra escolhida (half-up por linha) continua correta e nenhum valor do mês fictício muda; o que foi corrigido é o exemplo que a justificava, agora 12,500 kWh. O texto da seção traz a versão correta, e o erro foi corrigido também em `app/billing/money.py`, no teste correspondente e no README da aplicação.
+
+
 ## Camadas da plataforma
 
 > **Método.** Esta seção e a seguinte são o corpo obrigatório da Frente 3: organizam, nas quatro camadas pedidas pelo enunciado (física, conectividade, aplicação e apresentação), o que as demais seções deste dossiê e as Frentes 1 e 2 já estabeleceram. Nenhum componente é novo — cada caixa remete a uma decisão já documentada, com a remissão indicada. O diagrama está em [`../assets/arquitetura.png`](../assets/arquitetura.png) (editável em Mermaid: [`../assets/arquitetura.mmd`](../assets/arquitetura.mmd)).
@@ -572,7 +575,7 @@ Cenário: 48 unidades, **12 aderentes** ao programa, 1 ponto HCA G2 de 7 kW, vig
 | Taxa de disponibilidade | 180,00 / 12 | R$ 15,00 |
 | **Total** | | **R$ 72,33** |
 
-A linha da sessão 1006 exercita o half-up de verdade: 8,1585 arredonda para **8,16** (meio-para-cima), não 8,15 — é o caso que um arredondamento bancário (half-even) calcularia diferente, e o motivo de a Opção A ter fixado a regra explicitamente. As outras **9 unidades aderentes** sem sessão pagam só R$ 15,00 cada (caso 2 da Opção A); as 36 não aderentes, nada. Receita do mês: R$ 147,30 de energia + R$ 180,00 de disponibilidade = **R$ 327,30** sobre 203,120 kWh entregues.
+A linha da sessão 1006 exercita o arredondamento por linha: o produto é calculado em precisão total (8,15850) e só então levado a centavos, **8,16**. Ela não decide a convenção, porque 8,1585 não é empate — a fração descartada é 0,85 do centavo, e half-up e half-even devolvem o mesmo valor. A convenção só decide sozinha quando o produto cai exatamente na metade de um centavo, e com esta tarifa isso acontece em 12,500 kWh: 12,500 × 0,7252 = 9,06500 exato, que é **R$ 9,07** em half-up e R$ 9,06 em half-even (o padrão do IEEE-754, e também o que `round()` sobre `float` devolve, porque 0,7252 não tem representação binária exata). É esse o caso que justifica a Opção A ter fixado a regra explicitamente, e há teste para os três resultados em `app/billing/tests/test_mes_ficticio.py`. As outras **9 unidades aderentes** sem sessão pagam só R$ 15,00 cada (caso 2 da Opção A); as 36 não aderentes, nada. Receita do mês: R$ 147,30 de energia + R$ 180,00 de disponibilidade = **R$ 327,30** sobre 203,120 kWh entregues.
 
 **Reconciliação (decisão 5 em ação).** Em 10/07 chega a fatura Enel de junho: R$ 3.094,00 por 3.400 kWh → efetivo = **R$ 0,9100/kWh** (o salto sobre os 0,7252 é esperado: a provisória de bootstrap era a homologada **sem tributos**; daqui em diante a provisória passa a ser o efetivo conhecido e os ajustes encolhem para centavos). Δ = 0,9100 − 0,7252 = 0,1848. As faturas de **julho** carregam uma linha `tariff_adjustment` por unidade que consumiu em junho:
 

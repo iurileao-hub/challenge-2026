@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="49 testes" src="https://img.shields.io/badge/testes-49%20passando-2ea44f?style=flat-square">
+  <img alt="50 testes" src="https://img.shields.io/badge/testes-50%20passando-2ea44f?style=flat-square">
   <img alt="14 entidades" src="https://img.shields.io/badge/esquema-14%20entidades-0f6b4f?style=flat-square">
   <img alt="Recall da detecção: 100%" src="https://img.shields.io/badge/detecção%20de%20anomalias-recall%20100%25-0f6b4f?style=flat-square">
   <img alt="Sprint 2 entregue" src="https://img.shields.io/badge/Sprint%202-entregue-2ea44f?style=flat-square">
@@ -213,7 +213,7 @@ possível linha a linha.
 O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
-escrito meses antes do código, e não lidos da implementação. São 49 testes no total.
+escrito meses antes do código, e não lidos da implementação. São 50 testes no total.
 
 ### O que a implementação ensinou e a pesquisa não tinha visto
 

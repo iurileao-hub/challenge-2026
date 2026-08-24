@@ -3,12 +3,21 @@
 Uma regra so, e ela e inegociavel: **nenhum valor monetario passa por `float`
 em nenhum ponto do caminho**. O motor inteiro opera em `decimal.Decimal`.
 
-Nao e purismo. A Opcao A fixou `round2` half-up *por linha* e o dossie escolheu
-de proposito um caso que separa as convencoes: a sessao 1006 do mes ficticio da
-8,1585, que em half-up e 8,16 e em half-even (o padrao do `round()` do Python e
-do IEEE-754) e 8,15. Um centavo -- que numa assembleia de condominio vira uma
-hora de discussao, porque o morador refez a conta na calculadora do celular e
-achou outro numero.
+Nao e purismo, e a Opcao A fixou `round2` half-up *por linha* justamente por
+isso. A convencao so importa quando o produto cai **exatamente** na metade de um
+centavo, e nesse ponto ela decide sozinha o valor: 12,500 kWh x 0,7252 da
+9,06500 exato, que e 9,07 em half-up e 9,06 em half-even (o padrao do IEEE-754).
+Nessa mesma conta o `float` erra: `round(12.5 * 0.7252, 2)` devolve 9,06, porque
+0,7252 nao tem representacao binaria exata e o produto armazenado fica um fio
+abaixo do empate. Um centavo -- que numa assembleia de condominio vira uma hora
+de discussao, porque o morador refez a conta na calculadora do celular e achou
+outro numero.
+
+Cuidado com o exemplo errado: a sessao 1006 do mes ficticio da 11,250 x 0,7252 =
+8,1585, que arredonda para 8,16 em qualquer convencao (a fracao descartada e 0,85
+do centavo, nao metade dele). Ela exercita o arredondamento, nao a escolha da
+convencao. A versao anterior desta docstring, do teste correspondente e dos
+documentos afirmava que 8,1585 daria 8,15 em half-even; nao da.
 """
 
 from decimal import ROUND_HALF_UP, Decimal

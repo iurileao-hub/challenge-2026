@@ -396,7 +396,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 49 testes
+uv run pytest                    # 50 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -404,7 +404,7 @@ Distribuição da suíte:
 
 | Arquivo | Testes | O que garante |
 |---|---|---|
-| `billing/tests/test_mes_ficticio.py` | 18 | A suíte de aceitação: reproduz o mês fictício do dossiê |
+| `billing/tests/test_mes_ficticio.py` | 19 | A suíte de aceitação: reproduz o mês fictício do dossiê, e fixa a convenção de arredondamento |
 | `portal/tests/test_portal.py` | 16 | Interfaces, autorização por papel, contestação e revisão |
 | `intelligence/tests/test_deteccao.py` | 10 | Detecção nas duas fases, e o ciclo de estados da fatura |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
@@ -436,9 +436,19 @@ uv run python manage.py evaluate_ai --months 6
 
 ## 11. Decisões que valem explicação
 
-**Dinheiro nunca passa por `float`.** O dossiê fixou arredondamento half-up por linha e
-escolheu de propósito um caso que separa as convenções: 11,250 × 0,7252 = 8,1585, que é
-R$ 8,16 em half-up e R$ 8,15 em half-even (o padrão do IEEE-754). Há teste para isso.
+**Dinheiro nunca passa por `float`.** O dossiê fixou arredondamento half-up por linha,
+e a convenção só decide o valor quando o produto cai **exatamente** na metade de um
+centavo. Com a tarifa de R$ 0,7252, o consumo que faz isso é 12,500 kWh: dá 9,06500
+exato, que é R$ 9,07 em half-up e R$ 9,06 em half-even (o padrão do IEEE-754). O mesmo
+caso mostra por que o tipo importa: 0,7252 não tem representação binária exata, o produto
+em ponto flutuante fica um fio abaixo do empate e `round(12.5 * 0.7252, 2)` devolve 9,06.
+Há teste para os três resultados.
+
+> Correção de uma afirmação anterior: até 24/08/2026, este README, o `billing/money.py` e
+> o dossiê da Frente 3 usavam a sessão 1006 (11,250 × 0,7252 = 8,1585) como o caso que
+> separaria as convenções. Não separa: a fração descartada ali é 0,85 do centavo, não
+> metade dele, e half-up, half-even e `float` concordam em R$ 8,16. A regra escolhida
+> continua correta; o exemplo que a justificava, não.
 
 **Competência é calculada em fuso civil, sobre timestamps persistidos em UTC.** A sessão
 1010 começa 30/06 23:40 BRT, que em UTC já é 01/07. Decidir a competência pelo timestamp

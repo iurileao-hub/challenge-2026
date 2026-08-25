@@ -26,3 +26,9 @@ app/*.log
 
 # Handoff de sessao (artefato de processo)
 HANDOFF.md
+
+# Roteiro do video pitch (artefato de processo, individual)
+ROTEIRO-VIDEO.md
+
+# Descricao do video (artefato de processo, individual)
+DESCRICAO-VIDEO.md

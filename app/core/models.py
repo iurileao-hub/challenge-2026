@@ -13,9 +13,48 @@ Os `db_table` sao explicitos e iguais aos nomes do dossie: e o que torna a
 "aposta verificavel" da Frente 3-C conferivel tabela a tabela.
 """
 
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateRangeField, RangeBoundary, RangeOperators
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import F, Func, Q
+
+
+class DateRange(Func):
+    function = "DATERANGE"
+    output_field = DateRangeField()
+
+
+def no_overlap(name: str, lower: str, upper: str, scope: str) -> ExclusionConstraint:
+    """Vigencias do mesmo `scope` nao podem compartilhar nenhum dia.
+
+    CHECK nao resolve: a regra fala de PARES de linhas, e CHECK so enxerga a
+    linha corrente. A ferramenta e a EXCLUSION CONSTRAINT do Postgres (`&&` em
+    GiST combinado a `=` em B-tree, dai a extensao `btree_gist` da migracao
+    0002). Limite superior nulo vira infinito: "vigencia ainda aberta".
+
+    O intervalo e FECHADO nas duas pontas, `[inicio, fim]`, porque e assim que
+    o resto do sistema le `valid_to`/`end_date` ("vigente ate", inclusivo). A
+    primeira versao usava `[)` e aceitava uma vigencia terminando no dia 10 e
+    outra comecando no dia 10 -- duas tarifas valendo no mesmo dia.
+
+    Declarada AQUI, no modelo, e nao so numa migracao escrita a mao: a versao
+    anterior vivia apenas na migracao 0002, e a 0003, autogerada, a removeu em
+    silencio, porque o autodetector do Django trata como lixo toda constraint
+    que o estado conhece e o modelo nao declara. O banco ficou sem a protecao
+    enquanto a documentacao seguia afirmando que ela existia. O teste
+    `test_invariantes_de_banco` existe para que isso nao se repita.
+    """
+    return ExclusionConstraint(
+        name=name,
+        expressions=[
+            (
+                DateRange(lower, upper, RangeBoundary(inclusive_lower=True, inclusive_upper=True)),
+                RangeOperators.OVERLAPS,
+            ),
+            (scope, RangeOperators.EQUAL),
+        ],
+    )
 
 
 class MeasurementSource(models.TextChoices):
@@ -107,7 +146,8 @@ class ProgramEnrollment(models.Model):
             models.CheckConstraint(
                 condition=Q(end_date__isnull=True) | Q(end_date__gte=F("start_date")),
                 name="enrollment_end_after_start",
-            )
+            ),
+            no_overlap("enrollment_no_overlap_per_unit", "start_date", "end_date", "unit"),
         ]
 
     def __str__(self):
@@ -304,7 +344,16 @@ class ChargingSession(models.Model):
     session_start = models.DateTimeField("início")
     session_end = models.DateTimeField("fim", null=True, blank=True)
     meter_start = models.DecimalField(
-        "medidor no início (kWh)", max_digits=12, decimal_places=3
+        "medidor no início (kWh)",
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="Nulo = a fonte nao reporta medidor acumulado. E o caso do "
+        "historico de sessoes do SEMS+ (evidencia [O] da Frente 2), que so "
+        "entrega inicio, fim e energia. Exigir o campo obrigaria o adaptador a "
+        "inventar um numero, e numero inventado em trilha de auditoria e pior "
+        "que lacuna declarada.",
     )
     meter_stop = models.DecimalField(
         "medidor no fim (kWh)",
@@ -356,6 +405,20 @@ class ChargingSession(models.Model):
         "`tarifa_s` da formula (decisoes 4 e 5). Imune ate a correcao "
         "retroativa da propria vigencia.",
     )
+    source = models.TextField(
+        "fonte",
+        default="legacy",
+        help_text="Nome do adaptador que trouxe a sessao (`sems_stub`, "
+        "`semsplus_log`, `event_push`, `synthetic`...). Proveniencia: diante de "
+        "uma contestacao, a primeira pergunta e de onde veio o numero.",
+    )
+    source_ref = models.TextField(
+        "identificador na fonte",
+        null=True,
+        blank=True,
+        help_text="Id da sessao/transacao no sistema de origem. E a chave de "
+        "idempotencia preferida: reentrega do mesmo evento acha a mesma sessao.",
+    )
 
     class Meta:
         db_table = "charging_session"
@@ -388,6 +451,20 @@ class ChargingSession(models.Model):
                 | Q(applied_tariff_kwh__isnull=False),
                 name="session_closed_has_tariff_snapshot",
             ),
+            # Chave natural do equipamento. O gateway ja deduplicava por ela em
+            # codigo, mas "consulta e depois insere" perde a corrida quando duas
+            # entregas do mesmo evento chegam juntas (webhook reenviado durante
+            # um pull de reconciliacao). No banco, a segunda insercao falha em
+            # vez de virar cobranca em dobro.
+            models.UniqueConstraint(
+                fields=["charge_point", "session_start"],
+                name="session_unique_per_point_start",
+            ),
+            models.UniqueConstraint(
+                fields=["source", "source_ref"],
+                condition=Q(source_ref__isnull=False),
+                name="session_unique_per_source_ref",
+            ),
         ]
 
     def __str__(self):
@@ -398,6 +475,22 @@ class ChargingSession(models.Model):
         if not self.session_end:
             return None
         return (self.session_end - self.session_start).total_seconds() / 3600
+
+    @property
+    def final_reading_lost(self) -> bool:
+        """A leitura final se perdeu (caso degenerado da Opcao A)?
+
+        So faz sentido para fonte que REPORTA medidor: abriu com `meter_start`
+        e encerrou sem `meter_stop`. Quando os dois sao nulos a fonte nao
+        entrega medidor acumulado (historico do SEMS+), e tratar isso como
+        leitura perdida reteria a fatura de todo morador para sempre. Sessao em
+        andamento tambem nao perdeu nada: a leitura final ainda nao existe.
+        """
+        return (
+            self.status != self.Status.IN_PROGRESS
+            and self.meter_start is not None
+            and self.meter_stop is None
+        )
 
 
 class TelemetryReading(models.Model):
@@ -465,11 +558,32 @@ class TelemetryReading(models.Model):
         return f"{self.get_kind_display()} @ {self.ts.isoformat()}"
 
 
+class TariffPeriodQuerySet(models.QuerySet):
+    def in_force_on(self, condominium, day):
+        """A vigencia que cobre `day`, ou None.
+
+        Existe num lugar so porque ja existiu em dois (gateway e gerador), e os
+        dois filtravam `valid_to IS NULL`: so enxergavam a vigencia ABERTA. Uma
+        sessao de marco ingerida em julho, depois de um reajuste em maio, saia
+        sem tarifa -- e sessao encerrada sem tarifa viola o CHECK do banco, o que
+        derrubava o lote inteiro. Backfill de historico e exatamente o que uma
+        integracao real faz no primeiro dia.
+        """
+        return (
+            self.filter(condominium=condominium, valid_from__lte=day)
+            .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=day))
+            .order_by("-valid_from")
+            .first()
+        )
+
+
 class TariffPeriod(models.Model):
     """Parametros economicos versionados por vigencia (decisao 4).
 
     Guardar um valor unico "atual" faria um reajuste reescrever o passado.
     """
+
+    objects = TariffPeriodQuerySet.as_manager()
 
     condominium = models.ForeignKey(
         Condominium, on_delete=models.CASCADE, related_name="tariff_periods"
@@ -505,7 +619,10 @@ class TariffPeriod(models.Model):
             models.CheckConstraint(
                 condition=Q(valid_to__isnull=True) | Q(valid_to__gte=F("valid_from")),
                 name="tariff_period_valid_range",
-            )
+            ),
+            no_overlap(
+                "tariff_period_no_overlap_per_condo", "valid_from", "valid_to", "condominium"
+            ),
         ]
 
     def __str__(self):
@@ -721,6 +838,26 @@ class AnomalyFlag(models.Model):
         ACCEPTED = "accepted", "Aceita"
         CONTESTED = "contested", "Contestada"
         DISMISSED = "dismissed", "Descartada"
+        RESOLVED = "resolved", "Resolvida"
+
+    # O ciclo de vida, num lugar so. Estas tres tuplas ja existiram espalhadas:
+    # o motor de rateio retinha fatura so para `open`, o portal para `open`,
+    # `accepted` e `contested`, e a fila do sindico listava so `open`. O
+    # resultado eram tres defeitos do mesmo desencontro -- refechar a competencia
+    # apagava a contestacao do morador; a contestacao nunca chegava a fila de
+    # quem devia decidi-la; e problema CONFIRMADO nao tinha saida, a fatura
+    # ficava retida para sempre.
+    #
+    #   open ──────┐                       ┌─> dismissed  (nao havia problema)
+    #              ├─> [sindico decide] ───┤
+    #   contested ─┘                       └─> accepted ─> [caso tratado] ─> resolved
+    #
+    #: espera decisao do sindico: e a fila do painel
+    AWAITING = (Status.OPEN, Status.CONTESTED)
+    #: segura a linha da fatura
+    HOLDING = (Status.OPEN, Status.CONTESTED, Status.ACCEPTED)
+    #: um humano encerrou o caso, e a linha esta liberada
+    RELEASED = (Status.DISMISSED, Status.RESOLVED)
 
     session = models.ForeignKey(
         ChargingSession,
@@ -758,6 +895,15 @@ class AnomalyFlag(models.Model):
     )
     created_at = models.DateTimeField("detectada em", auto_now_add=True)
     reviewed_at = models.DateTimeField("revisada em", null=True, blank=True)
+    resolution = models.TextField(
+        "desfecho",
+        null=True,
+        blank=True,
+        help_text="O que o gestor fez para encerrar um caso confirmado. Texto "
+        "obrigatorio na resolucao: liberar cobranca retida sem dizer por que e o "
+        "que a trilha de auditoria existe para impedir.",
+    )
+    resolved_at = models.DateTimeField("resolvida em", null=True, blank=True)
 
     class Meta:
         db_table = "anomaly_flag"
@@ -769,7 +915,7 @@ class AnomalyFlag(models.Model):
                 name="anomaly_targets_session_or_point",
             ),
             models.CheckConstraint(
-                condition=Q(status__in=["open", "accepted", "contested", "dismissed"]),
+                condition=Q(status__in=["open", "accepted", "contested", "dismissed", "resolved"]),
                 name="anomaly_status_valid",
             ),
         ]
@@ -780,7 +926,7 @@ class AnomalyFlag(models.Model):
     #: que e o que a trilha de auditoria e o CSV preservam.
     DETECTOR_LEGIVEL = {
         "rule": "verificação automática de leitura",
-        "isolation_forest": "comparação com o padrão histórico da credencial",
+        "isolation_forest": "comparação com o padrão histórico do condomínio",
         "morador": "contestação do próprio morador",
     }
 

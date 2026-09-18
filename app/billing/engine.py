@@ -23,9 +23,10 @@ from datetime import date
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
+from billing.audit import held_session_ids
 from billing.competence import Competence
 from billing.money import round2
 from core.models import (
@@ -75,6 +76,7 @@ class ClosingReport:
     availability_collected: Decimal = Decimal("0.00")
     energy_total: Decimal = Decimal("0.00")
     kwh_total: Decimal = Decimal("0.000")
+    adjustments_total: Decimal = Decimal("0.00")
     flagged_lines: int = 0
 
     @property
@@ -89,7 +91,9 @@ class ClosingReport:
 
     @property
     def total_billed(self) -> Decimal:
-        return round2(self.energy_total + self.availability_collected)
+        """A soma das faturas. Inclui os ajustes de reconciliacao: sem eles o
+        relatorio de julho divergia das proprias faturas em R$ 37,54."""
+        return round2(self.energy_total + self.availability_collected + self.adjustments_total)
 
 
 def enrolled_units(condominium: Condominium, competence: Competence) -> list[EnrollmentShare]:
@@ -147,6 +151,9 @@ def billable_sessions(condominium: Condominium, competence: Competence):
     a virada de mes sem depender do fuso da sessao do Postgres.
     """
     start_utc, end_utc = competence.utc_window()
+    billed_elsewhere = InvoiceLine.objects.filter(session=OuterRef("pk")).exclude(
+        invoice__competence=str(competence)
+    )
     return (
         ChargingSession.objects.filter(
             charge_point__condominium=condominium,
@@ -156,9 +163,50 @@ def billable_sessions(condominium: Condominium, competence: Competence):
             credential__isnull=False,
             applied_tariff_kwh__isnull=False,
         )
+        # Ja cobrada como sessao tardia numa competencia posterior: reprocessar
+        # o mes de origem nao pode cobra-la de novo.
+        .exclude(Exists(billed_elsewhere))
         .select_related("credential__user__unit", "charge_point")
         .order_by("session_start", "id")
     )
+
+
+def late_sessions(condominium: Condominium, competence: Competence):
+    """Sessoes de meses JA FECHADOS que so agora se tornaram cobraveis.
+
+    Dois caminhos levam ate aqui, e os dois sao rotina numa operacao real: a
+    sessao orfa que o gestor vinculou a um morador depois do fechamento, e a
+    sessao que a fonte entregou com atraso (o pull de reconciliacao que
+    recupera o que o webhook perdeu).
+
+    A regra e a mesma da reconciliacao de tarifa: **fatura fechada nao se
+    reescreve; o que chega depois entra na proxima**, como linha identificada.
+    So vale para competencia que o motor ja fechou -- mes nunca fechado nao tem
+    sessao "atrasada", tem sessao a espera do proprio fechamento.
+    """
+    start_utc, _ = competence.utc_window()
+    fechadas = set(
+        Invoice.objects.filter(condominium=condominium)
+        .exclude(competence=str(competence))
+        .values_list("competence", flat=True)
+    )
+    candidatas = (
+        ChargingSession.objects.filter(
+            charge_point__condominium=condominium,
+            session_start__lt=start_utc,
+            status__in=BILLABLE_STATUSES,
+            credential__isnull=False,
+            applied_tariff_kwh__isnull=False,
+        )
+        .exclude(Exists(
+            InvoiceLine.objects.filter(session=OuterRef("pk")).exclude(
+                invoice__competence=str(competence)
+            )
+        ))
+        .select_related("credential__user__unit", "charge_point")
+        .order_by("session_start", "id")
+    )
+    return [s for s in candidatas if str(Competence.of(s.session_start)) in fechadas]
 
 
 #: Vocabulario OCPP traduzido para quem le a fatura.
@@ -200,16 +248,14 @@ def _session_description(session: ChargingSession, *, com_nome: bool = True) -> 
         base += f" — sessão interrompida: {razao_legivel(session.stop_reason)}"
     elif session.status == ChargingSession.Status.FAULT:
         base += f" — falha no carregador: {razao_legivel(session.stop_reason)}"
-    if session.meter_stop is None:
+    if session.final_reading_lost:
         base += " — a leitura final não chegou, cobrada a última leitura confirmada"
     return base
 
 
-def _needs_audit(session: ChargingSession, flagged_session_ids: set[int]) -> bool:
-    """Uma linha vai para auditoria por dois caminhos, ambos da Sprint 1:
-    telemetria perdida (Opcao A, caso degenerado) ou anomalia aberta detectada
-    antes do fechamento (Opcao B)."""
-    return session.meter_stop is None or session.id in flagged_session_ids
+def _needs_audit(session: ChargingSession, held_ids: set[int]) -> bool:
+    """A regra mora em `billing.audit`, compartilhada com o portal."""
+    return session.id in held_ids
 
 
 @transaction.atomic
@@ -230,7 +276,8 @@ def close_competence(
     comp_str = str(comp)
 
     existing = Invoice.objects.filter(condominium=condominium, competence=comp_str)
-    locked = existing.filter(status__in=[Invoice.Status.CLOSED, Invoice.Status.PAID])
+    # Travada e toda fatura que ja saiu da mao do motor -- inclusive em atraso.
+    locked = existing.exclude(status__in=[Invoice.Status.DRAFT, Invoice.Status.UNDER_REVIEW])
     if locked.exists() and not force:
         raise BillingError(
             f"competencia {comp_str} ja possui {locked.count()} fatura(s) fechada(s); "
@@ -253,12 +300,10 @@ def close_competence(
         competence=comp_str, n_enrolled=n_enrolled, availability_fee_total=round2(fee_total)
     )
 
-    sessions = list(billable_sessions(condominium, comp))
-    flagged_session_ids = set(
-        AnomalyFlag.objects.filter(
-            session__in=[s.id for s in sessions], status=AnomalyFlag.Status.OPEN
-        ).values_list("session_id", flat=True)
-    )
+    tardias = late_sessions(condominium, comp)
+    tardias_ids = {s.id for s in tardias}
+    sessions = tardias + list(billable_sessions(condominium, comp))
+    flagged_session_ids = held_session_ids(s.id for s in sessions)
 
     sessions_by_unit: dict[int, list[ChargingSession]] = {}
     visitor_sessions: dict[int, list[ChargingSession]] = {}
@@ -271,7 +316,23 @@ def close_competence(
             visitor_sessions.setdefault(user.id, []).append(s)
 
     units_by_id = {sh.unit.id: sh for sh in shares}
-    all_unit_ids = set(units_by_id) | set(sessions_by_unit)
+    reconciliations = list(
+        TariffReconciliation.objects.filter(
+            condominium=condominium, settled_in_competence=comp_str
+        ).order_by("competence")
+    )
+    # Quem consumiu na competencia apurada deve (ou recebe) o ajuste, ainda que
+    # tenha saido do programa e nao carregue em M. Sem isto, a unidade que
+    # encerrou a adesao no ultimo dia do mes nunca acertava a diferenca.
+    owes_adjustment = set(
+        InvoiceLine.objects.filter(
+            kind=InvoiceLine.Kind.SESSION,
+            invoice__condominium=condominium,
+            invoice__competence__in=[r.competence for r in reconciliations],
+            invoice__unit__isnull=False,
+        ).values_list("invoice__unit_id", flat=True)
+    )
+    all_unit_ids = set(units_by_id) | set(sessions_by_unit) | owes_adjustment
 
     issued = timezone.now()
     for unit_id in sorted(all_unit_ids):
@@ -296,7 +357,10 @@ def close_competence(
                     invoice=invoice,
                     kind=InvoiceLine.Kind.SESSION,
                     session=s,
-                    description=_session_description(s),
+                    description=_session_description(s) + (
+                        f" — recarga de {Competence.of(s.session_start)}, identificada "
+                        "depois do fechamento daquele mês" if s.id in tardias_ids else ""
+                    ),
                     energy_kwh=s.energy_kwh,
                     unit_price_kwh=s.applied_tariff_kwh,
                     amount=round2(Decimal(s.energy_kwh) * Decimal(s.applied_tariff_kwh)),
@@ -319,9 +383,11 @@ def close_competence(
             )
             report.availability_collected += cota
 
-        adjustment = _adjustment_line(condominium, unit, comp, invoice)
-        if adjustment:
-            lines.append(adjustment)
+        for rec in reconciliations:
+            adjustment = _adjustment_line(rec, unit, invoice)
+            if adjustment:
+                lines.append(adjustment)
+                report.adjustments_total += adjustment.amount
 
         InvoiceLine.objects.bulk_create(lines)
         invoice.total_amount = round2(sum((ln.amount for ln in lines), Decimal("0.00")))
@@ -363,7 +429,7 @@ def _close_visitor_invoice(condominium, visitor_id, vsessions, comp_str, issued,
             energy_kwh=s.energy_kwh,
             unit_price_kwh=s.applied_tariff_kwh,
             amount=round2(Decimal(s.energy_kwh) * Decimal(s.applied_tariff_kwh)),
-            flagged_for_audit=s.meter_stop is None,
+            flagged_for_audit=s.final_reading_lost,
         )
         for s in vsessions
     ]
@@ -377,42 +443,64 @@ def _close_visitor_invoice(condominium, visitor_id, vsessions, comp_str, issued,
         report.kwh_total += Decimal(ln.energy_kwh)
 
 
-def _adjustment_line(condominium, unit, comp: Competence, invoice) -> InvoiceLine | None:
-    """A linha de ajuste da reconciliacao (decisao 5).
+def _adjustment_line(rec: TariffReconciliation, unit, invoice) -> InvoiceLine | None:
+    """A linha de ajuste de UMA reconciliacao, para UMA unidade (decisao 5).
 
-    A fatura de M carrega o ajuste da competencia cujo `settled_in_competence`
-    aponta para M -- normalmente M-1. Uma linha por unidade, calculada sobre o
-    kWh total que a unidade consumiu na competencia apurada.
+    A fatura de M carrega o ajuste de toda competencia cujo
+    `settled_in_competence` aponta para M -- normalmente so M-1, mas a conta de
+    luz que atrasa faz duas cairem no mesmo mes, e cada uma gera a sua linha.
+
+    A base sao as LINHAS FATURADAS da competencia apurada, e nao as sessoes:
+
+    - o ajuste corrige o que foi cobrado. Sessao orfa vinculada depois do
+      fechamento nunca foi cobrada; ajusta-la seria cobrar a diferenca de um
+      valor que ninguem pagou;
+    - cada linha guarda a tarifa que de fato lhe foi aplicada. Se a tarifa
+      mudou no meio do mes, o complemento de cada sessao e `efetiva - a SUA
+      tarifa`, e nao um delta unico para o mes inteiro.
     """
-    rec = TariffReconciliation.objects.filter(
-        condominium=condominium, settled_in_competence=str(comp)
-    ).first()
-    if not rec or rec.delta_price_kwh == 0:
-        return None
-
-    apurada = Competence.parse(rec.competence)
-    kwh = sum(
-        (Decimal(s.energy_kwh) for s in billable_sessions(condominium, apurada)
-         if s.credential and s.credential.user.unit_id == unit.id),
-        Decimal("0.000"),
+    billed = list(
+        InvoiceLine.objects.filter(
+            kind=InvoiceLine.Kind.SESSION,
+            invoice__unit=unit,
+            invoice__condominium=rec.condominium,
+            invoice__competence=rec.competence,
+        )
     )
+    kwh = sum((Decimal(ln.energy_kwh) for ln in billed), Decimal("0.000"))
     if kwh == 0:
         # "As aderentes sem consumo nao recebem ajuste -- delta multiplica kWh,
         # e o kWh delas e zero."
         return None
 
-    amount = round2(kwh * Decimal(rec.delta_price_kwh))
-    sinal = "Complemento" if rec.delta_price_kwh > 0 else "Devolução"
+    effective = Decimal(rec.effective_price_kwh)
+    amount = round2(
+        sum((Decimal(ln.energy_kwh) * (effective - Decimal(ln.unit_price_kwh)) for ln in billed),
+            Decimal("0"))
+    )
+    if amount == 0:
+        return None
+
+    tarifas = {Decimal(ln.unit_price_kwh) for ln in billed}
+    sinal = "Complemento" if amount > 0 else "Devolução"
+    if len(tarifas) == 1:
+        provisoria = tarifas.pop()
+        delta = effective - provisoria
+        detalhe = (
+            f"{kwh} kWh × R$ {delta}/kWh (efetiva R$ {effective} menos provisória R$ {provisoria})"
+        )
+    else:
+        delta = (amount / kwh).quantize(Decimal("0.0001"))
+        detalhe = (
+            f"{kwh} kWh, cada sessão pela diferença entre a efetiva (R$ {effective}) "
+            f"e a tarifa que lhe foi aplicada; média de R$ {delta}/kWh"
+        )
     return InvoiceLine(
         invoice=invoice,
         kind=InvoiceLine.Kind.TARIFF_ADJUSTMENT,
         reconciliation=rec,
-        description=(
-            f"{sinal} de tarifa referente a {rec.competence}: {kwh} kWh × "
-            f"R$ {rec.delta_price_kwh}/kWh (efetiva R$ {rec.effective_price_kwh} "
-            f"menos provisória R$ {rec.provisional_price_kwh})"
-        ),
+        description=f"{sinal} de tarifa referente a {rec.competence}: {detalhe}",
         energy_kwh=kwh,
-        unit_price_kwh=rec.delta_price_kwh,
+        unit_price_kwh=delta,
         amount=amount,
     )

@@ -30,15 +30,26 @@ from django.db import transaction
 from billing.competence import condo_tz
 from billing.money import round2, round3
 from core.models import (
-    ChargePoint,
     ChargingSession,
     Condominium,
     Credential,
     MeasurementSource,
-    TariffPeriod,
     TelemetryReading,
 )
 from ingestion.calibration import CalibrationParams
+from ingestion.gateway import (
+    CanonicalReading,
+    CanonicalSession,
+    IngestionGateway,
+    IngestionReport,
+)
+from ingestion.models import IngestionRun, RawEvent
+
+#: Quanto um morador espera por um conector ocupado antes de desistir e
+#: carregar em outro lugar. Premissa declarada, como o perfil semanal.
+MAX_WAIT = timedelta(hours=6)
+#: Folga entre um carro sair e o seguinte plugar.
+TURNAROUND = timedelta(minutes=10)
 
 #: Intervalo entre amostras de telemetria dentro da sessao (OCPP MeterValues).
 METER_INTERVAL = timedelta(minutes=15)
@@ -63,11 +74,18 @@ class GroundTruth:
     charge_point_id: int | None
     category: str
     detail: str
+    #: intensidade do que foi injetado, na unidade do limiar da regra (horas
+    #: ociosas; razao de potencia). E o eixo da curva de sensibilidade.
+    magnitude: float | None = None
 
 
 @dataclass
 class GenerationResult:
     sessions_created: int = 0
+    #: o conector estava ocupado e o carro esperou a vez
+    sessions_deferred: int = 0
+    #: a espera passaria de `MAX_WAIT`: o morador desistiu -- demanda reprimida
+    sessions_lost: int = 0
     readings_created: int = 0
     ground_truth: list[GroundTruth] = field(default_factory=list)
     kwh_total: Decimal = Decimal("0.000")
@@ -92,11 +110,18 @@ class SyntheticGenerator:
         params: CalibrationParams | None = None,
         seed: int = 20260831,
         anomaly_rate: float = 0.06,
+        spread: bool = False,
     ):
         self.condo = condominium
         self.params = params or CalibrationParams.load()
         self.rng = np.random.default_rng(seed)
         self.anomaly_rate = anomaly_rate
+        # `spread=False`: anomalias NITIDAS, bem alem do limiar das regras. Serve
+        # a demonstracao e ao teste de integracao ("o que e obvio e pego?").
+        # `spread=True`: intensidades espalhadas, inclusive ABAIXO do limiar.
+        # Serve a medicao: recall sobre anomalia que sempre ultrapassa o limiar
+        # e 100% por construcao, e nao diz nada sobre onde o detector opera.
+        self.spread = spread
         self.tz = condo_tz()
 
     # -- amostragem calibrada -------------------------------------------------
@@ -120,11 +145,9 @@ class SyntheticGenerator:
 
     # -- construcao -----------------------------------------------------------
 
-    def _effective_power(self, point: ChargePoint) -> float:
-        """Potencia efetiva do ponto: nominal com perdas e limitacao do
-        veiculo (nem todo EV aceita a potencia toda do wallbox)."""
-        nominal = float(point.rated_power_kw)
-        return nominal * float(self.rng.uniform(0.72, 0.96))
+    # Potencia efetiva do ponto = nominal x fator em [0,72; 0,96]: perdas e
+    # limitacao do veiculo (nem todo EV aceita a potencia toda do wallbox). O
+    # fator e sorteado em `_plan_session`.
 
     def _battery_demand(self, credential: Credential) -> tuple[float, float]:
         """Quanto a bateria aceita nesta chegada: o carro nao chega vazio."""
@@ -134,17 +157,38 @@ class SyntheticGenerator:
         return capacity * (1.0 - soc), capacity
 
     @transaction.atomic
-    def generate(self, start: date, end: date) -> GenerationResult:
-        """Gera o periodo [start, end] para todos os pontos do condominio."""
+    def generate(
+        self,
+        start: date,
+        end: date,
+        *,
+        credentials: Iterable[Credential] | None = None,
+        reserved: Iterable[tuple[datetime, datetime]] = (),
+        heartbeats: bool = True,
+    ) -> GenerationResult:
+        """Gera o periodo [start, end] para todos os pontos do condominio.
+
+        O gerador e uma FONTE como as outras: monta registros canonicos e os
+        entrega ao gateway, que valida, resolve credencial e congela tarifa. A
+        primeira versao gravava direto no banco -- e com isso a "ingestao
+        plugavel" do projeto so era exercitada pelos testes, nunca pelo dado
+        que a demonstracao mostra.
+
+        `reserved` sao intervalos em que o conector ja esta tomado por sessoes
+        que ainda vao chegar por outra fonte (o historico real do SEMS+).
+        """
         result = GenerationResult()
-        points = list(self.condo.charge_points.all())
+        points = list(self.condo.charge_points.order_by("id"))
         if not points:
             raise ValueError("condominio sem ponto de recarga cadastrado")
 
-        credentials = list(
-            Credential.objects.filter(
+        if credentials is None:
+            credentials = Credential.objects.filter(
                 user__unit__condominium=self.condo, status=Credential.Status.ACTIVE
-            ).select_related("user__unit").prefetch_related("user__vehicles")
+            )
+        credentials = list(
+            Credential.objects.filter(pk__in=[c.pk for c in credentials])
+            .select_related("user__unit").prefetch_related("user__vehicles").order_by("id")
         )
         if not credentials:
             raise ValueError("condominio sem credenciais ativas")
@@ -163,30 +207,85 @@ class SyntheticGenerator:
             self.rng.choice(len(planned), size=min(n_anomalies, len(planned)), replace=False).tolist()
         ) if planned else set()
 
+        # Um conector atende um carro por vez. A primeira versao sorteava os
+        # instantes de forma independente e produziu 205 pares de sessoes
+        # SOBREPOSTAS em 366, num unico carregador de 7 kW: dois carros no mesmo
+        # cabo. Agora cada ponto tem agenda, semeada com o que ja existe no
+        # banco (as sessoes do mes ficticio) e com os intervalos reservados.
+        agenda: dict[int, list[tuple[datetime, datetime]]] = {p.id: list(reserved) for p in points}
+        for s_ in ChargingSession.objects.filter(charge_point__in=points, session_end__isnull=False):
+            agenda[s_.charge_point_id].append((s_.session_start, s_.session_end))
+
         # Estado do medidor por ponto -- acumulado, como no equipamento real.
         meters = {p.id: Decimal("1000.000") for p in points}
-        readings: list[TelemetryReading] = []
+
+        self._gateway = IngestionGateway(self.condo)
+        self._run = IngestionRun.objects.create(
+            condominium=self.condo, source="synthetic", mode=IngestionRun.Mode.FILE
+        )
+        self._report = IngestionReport(source="synthetic", run_id=self._run.id)
 
         for i, (moment, cred) in enumerate(planned):
-            point = points[i % len(points)]
             kind = (
                 ANOMALY_KINDS[int(self.rng.integers(0, len(ANOMALY_KINDS)))]
                 if i in anomaly_idx
                 else None
             )
-            session, session_readings, truth = self._build_session(
-                point, cred, moment, meters, anomaly=kind
-            )
+            plan = self._plan_session(cred, kind)
+            slot = self._first_free_slot(agenda, points, moment, plan["plugged_hours"])
+            if slot is None:
+                result.sessions_lost += 1
+                continue
+            point, begin = slot
+            if begin.astimezone(self.tz).date() > end:
+                # A espera empurraria a recarga para DEPOIS do periodo pedido.
+                # Sem este corte, uma sessao planejada para a noite de 31/05
+                # comecava as 02h43 de 01/06 -- dentro da competencia de junho,
+                # alterando a fatura de uma unidade do mes ficticio do dossie.
+                result.sessions_lost += 1
+                continue
+            if begin > moment:
+                result.sessions_deferred += 1
+            session, n_readings, truth = self._build_session(point, cred, begin, meters, plan)
+            agenda[point.id].append((session.session_start, session.session_end))
             result.sessions_created += 1
+            result.readings_created += n_readings
             result.kwh_total += Decimal(session.energy_kwh)
-            readings.extend(session_readings)
             if truth:
                 result.ground_truth.append(truth)
 
-        readings.extend(self._heartbeats(points, start, end, result))
-        TelemetryReading.objects.bulk_create(readings, batch_size=2000)
-        result.readings_created = len(readings)
+        if heartbeats:
+            beats = self._heartbeats(points, start, end, result)
+            TelemetryReading.objects.bulk_create(beats, batch_size=2000)
+            result.readings_created += len(beats)
+            # Heartbeat sintetico nao ganha um registro bruto por linha: sao
+            # milhares de linhas identicas, e o diario existe para auditar o que
+            # vira COBRANCA. Entra como um resumo so.
+            RawEvent.objects.create(
+                run=self._run, source="synthetic", outcome=RawEvent.Outcome.TELEMETRY,
+                payload={"heartbeats": len(beats), "de": start.isoformat(), "ate": end.isoformat()},
+            )
+        self._report.readings_ingested = result.readings_created
+        self._gateway.finish(self._run, self._report)
         return result
+
+    def _first_free_slot(self, agenda, points, moment, plugged_hours):
+        """O primeiro conector que libera. Devolve (ponto, inicio) ou None."""
+        dur = timedelta(hours=plugged_hours)
+        melhor = None
+        for p in points:
+            begin = moment
+            for a, b in sorted(agenda[p.id]):
+                if b + TURNAROUND <= begin:
+                    continue
+                if a >= begin + dur + TURNAROUND:
+                    break
+                begin = b + TURNAROUND
+            if melhor is None or begin < melhor[1]:
+                melhor = (p, begin)
+        if melhor is None or melhor[1] - moment > MAX_WAIT:
+            return None
+        return melhor
 
     def _months_between(self, start: date, end: date) -> list[tuple[date, date]]:
         out, cur = [], date(start.year, start.month, 1)
@@ -216,53 +315,64 @@ class SyntheticGenerator:
         minute = int(self.rng.integers(0, 60))
         return datetime.combine(day, time(hour, minute), tzinfo=self.tz)
 
-    def _tariff_for(self, moment: datetime) -> TariffPeriod | None:
-        d = moment.astimezone(self.tz).date()
-        return (
-            TariffPeriod.objects.filter(condominium=self.condo, valid_from__lte=d)
-            .filter(valid_to__isnull=True)
-            .order_by("-valid_from")
-            .first()
-        )
+    def _plan_session(self, cred: Credential, anomaly: str | None) -> dict:
+        """Sorteia a fisica da sessao ANTES de saber quando ela comeca.
 
-    def _build_session(self, point, cred, start_moment, meters, anomaly: str | None):
-        """Monta uma sessao e sua telemetria, aplicando a anomalia quando houver."""
+        A duracao precisa existir antes do encaixe na agenda do conector; por
+        isso o sorteio saiu de dentro da construcao.
+        """
         plugged_hours = self._sample_duration_hours()
-        power = self._effective_power(point)
+        power_factor = float(self.rng.uniform(0.72, 0.96))
         demand, capacity = self._battery_demand(cred)
 
-        degraded_from = None
         force_idle_hours = None
+        degraded_from = None
+        degraded_to = 0.35
+        force_energy_factor = None
         if anomaly == "idle":
             # Carro-tampao. O tempo ocioso e fixado DEPOIS de saber quanto tempo
             # a recarga leva -- multiplicar o tempo plugado nao bastava, porque
             # a energia demandada crescia junto e a ociosidade nao aparecia.
-            force_idle_hours = float(self.rng.uniform(5.0, 11.0))
+            force_idle_hours = float(self.rng.uniform(*((1.0, 11.0) if self.spread else (5.0, 11.0))))
         elif anomaly == "power_degradation":
             degraded_from = 0.45  # a partir de 45% da sessao a potencia despenca
-        force_energy = None
-        if anomaly == "consumption":
+            degraded_to = float(self.rng.uniform(0.25, 0.90)) if self.spread else 0.35
+        elif anomaly == "consumption":
             # Energia acima do que a bateria comporta -- fisicamente impossivel,
             # portanto medicao ou desvio, nunca recarga legitima.
             #
             # Aplicada na energia FINAL, e nao na demanda: aumentar a demanda so
             # fazia o `min(demanda, potencia x tempo)` truncar a anomalia de
             # volta ao normal. O gabarito acusou isso com recall zero.
-            force_energy = capacity * float(self.rng.uniform(1.15, 1.45))
+            force_energy_factor = float(self.rng.uniform(1.15, 1.45))
+        return {
+            "anomaly": anomaly, "plugged_hours": plugged_hours, "power_factor": power_factor,
+            "demand": demand, "capacity": capacity, "force_idle_hours": force_idle_hours,
+            "degraded_from": degraded_from, "degraded_to": degraded_to,
+            "force_energy_factor": force_energy_factor,
+        }
+
+    def _build_session(self, point, cred, start_moment, meters, plan: dict):
+        """Monta a sessao canonica, com telemetria, e a entrega ao gateway."""
+        anomaly = plan["anomaly"]
+        plugged_hours = plan["plugged_hours"]
+        power = float(point.rated_power_kw) * plan["power_factor"]
+        demand, capacity = plan["demand"], plan["capacity"]
+        degraded_from = plan["degraded_from"]
 
         charging_hours = min(demand / power, plugged_hours)
-        if force_idle_hours is not None:
-            plugged_hours = min(charging_hours + force_idle_hours, 22.0)
+        if plan["force_idle_hours"] is not None:
+            plugged_hours = min(charging_hours + plan["force_idle_hours"], 22.0)
         if degraded_from:
             full = charging_hours * degraded_from
             rest = (charging_hours - full) * 2.2   # leva mais tempo pela queda
             charging_hours = min(full + rest, plugged_hours)
-            energy = full * power + (charging_hours - full) * power * 0.35
+            energy = full * power + (charging_hours - full) * power * plan["degraded_to"]
         else:
             energy = charging_hours * power
 
-        if force_energy is not None:
-            energy = force_energy
+        if plan["force_energy_factor"] is not None:
+            energy = capacity * plan["force_energy_factor"]
         energy_dec = round3(Decimal(str(max(energy, 0.05))))
         meter_start = meters[point.id]
         meter_stop = meter_start + energy_dec
@@ -275,10 +385,13 @@ class SyntheticGenerator:
             status = ChargingSession.Status.INTERRUPTED
             stop_reason = "PowerLoss"
 
-        tariff = self._tariff_for(start_moment)
-        session = ChargingSession.objects.create(
-            charge_point=point,
-            credential=cred,
+        session_end = start_moment + timedelta(hours=plugged_hours)
+        readings = list(self._session_readings(
+            start_moment, session_end, meter_start, power, charging_hours, degraded_from,
+            plan["degraded_to"],
+        ))
+        canonical = CanonicalSession(
+            charge_point_serial=point.serial_number,
             auth_id=cred.auth_tag,
             auth_method=(
                 ChargingSession.AuthMethod.RFID
@@ -286,7 +399,7 @@ class SyntheticGenerator:
                 else ChargingSession.AuthMethod.APP
             ),
             session_start=start_moment,
-            session_end=start_moment + timedelta(hours=plugged_hours),
+            session_end=session_end,
             meter_start=meter_start,
             meter_stop=None if lost_reading else meter_stop,
             energy_kwh=energy_dec,
@@ -294,13 +407,13 @@ class SyntheticGenerator:
             status=status,
             stop_reason=stop_reason,
             measurement_source=MeasurementSource.CLOUD,
-            applied_tariff=tariff,
-            applied_tariff_kwh=tariff.price_kwh if tariff else Decimal("0.7252"),
+            readings=readings,
         )
-
-        readings = list(
-            self._session_readings(session, point, power, charging_hours, plugged_hours, degraded_from)
-        )
+        antes = len(self._report.sessions)
+        desfecho = self._gateway.process(canonical, self._run, self._report)
+        if len(self._report.sessions) == antes:
+            raise RuntimeError(f"gateway recusou sessao sintetica ({desfecho}): {self._report.rejections[-1:]}")
+        session = self._report.sessions[-1]
 
         truth = None
         if anomaly:
@@ -311,24 +424,27 @@ class SyntheticGenerator:
                 detail={
                     "consumption": f"energia {energy_dec} kWh acima da capacidade da bateria ({capacity:.1f} kWh)",
                     "idle": f"{plugged_hours - charging_hours:.1f} h plugado sem carregar",
-                    "power_degradation": "potencia cai a 35% no meio da sessao",
+                    "power_degradation": f"potencia cai a {plan['degraded_to']:.0%} no meio da sessao",
                     "metering": "leitura final do medidor perdida",
                 }[anomaly],
+                magnitude={
+                    "idle": plugged_hours - charging_hours,
+                    "power_degradation": plan["degraded_to"],
+                }.get(anomaly),
             )
-        return session, readings, truth
+        return session, len(readings), truth
 
-    def _session_readings(self, session, point, power, charging_hours, plugged_hours, degraded_from):
+    def _session_readings(self, start, end, meter_start, power, charging_hours, degraded_from,
+                          degraded_to=0.35):
         """MeterValues a cada 15 min, com a potencia caindo a zero quando a
         bateria enche -- e o sinal que a deteccao de ociosidade le."""
-        t = session.session_start
-        end = session.session_end
-        acc = Decimal(session.meter_start)
-        charge_end = session.session_start + timedelta(hours=charging_hours)
+        t = start
+        acc = Decimal(meter_start)
+        charge_end = start + timedelta(hours=charging_hours)
         step_h = METER_INTERVAL.total_seconds() / 3600
 
-        yield TelemetryReading(
-            charge_point=point, session=session, ts=t,
-            kind=TelemetryReading.Kind.STATUS_CHANGE,
+        yield CanonicalReading(
+            ts=t, kind=TelemetryReading.Kind.STATUS_CHANGE,
             state=TelemetryReading.State.CHARGING,
             power_kw=round2(Decimal(str(power))), energy_kwh_total=acc,
         )
@@ -337,18 +453,15 @@ class SyntheticGenerator:
             charging = t <= charge_end
             p = power
             if charging and degraded_from:
-                frac = (t - session.session_start).total_seconds() / max(
-                    (charge_end - session.session_start).total_seconds(), 1
-                )
+                frac = (t - start).total_seconds() / max((charge_end - start).total_seconds(), 1)
                 if frac > degraded_from:
-                    p = power * 0.35
+                    p = power * degraded_to
             if not charging:
                 p = 0.0
             else:
                 acc = acc + round3(Decimal(str(p * step_h)))
-            yield TelemetryReading(
-                charge_point=point, session=session, ts=min(t, end),
-                kind=TelemetryReading.Kind.METER_VALUE,
+            yield CanonicalReading(
+                ts=min(t, end), kind=TelemetryReading.Kind.METER_VALUE,
                 state=(
                     TelemetryReading.State.CHARGING if charging
                     else TelemetryReading.State.FINISHED

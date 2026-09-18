@@ -172,6 +172,7 @@ def build_jardim_aurora(*, extra_residents: bool = False) -> dict:
             meter_stop=None if lost_reading else meter,
             energy_kwh=energy,
             max_power_kw=Decimal("7.00"),
+            source="dossie_sprint1",
             status=status,
             stop_reason=reason,
             measurement_source=MeasurementSource.CLOUD,

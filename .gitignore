@@ -7,6 +7,8 @@ data/*
 !data/ocm_api_nokey_response.txt
 !data/ocm_poi_474661_full.json
 !data/ocm_openapi_spec.yaml
+# Historico real de recarga do HCA G2 (SEMS+, nivel [O]); entra pelo gateway na Sprint 2
+!data/semsplus_charge_log_2026-06.csv
 .ipynb_checkpoints/
 __pycache__/
 .venv/

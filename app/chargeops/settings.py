@@ -46,6 +46,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "portal.middleware.CondoTimezoneMiddleware",
 ]
 
 ROOT_URLCONF = "chargeops.urls"
@@ -89,7 +90,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = "pt-br"
 
 # Persistencia em UTC (decisao da Frente 3-C: TIMESTAMPTZ armazenado em UTC).
-# A apresentacao converte para o fuso do condominio -- ver core.timeutils.
+# A apresentacao converte para o fuso do condominio -- ver portal.middleware.
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
@@ -109,3 +110,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/entrar/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/entrar/"
+
+# --- Ingestao por push ------------------------------------------------------
+# Segredo HMAC por fonte: "fonte1:segredo1,fonte2:segredo2". Fonte sem segredo
+# tem o endpoint DESLIGADO (503) -- nao existe default, de proposito: endpoint
+# que aceita escrita com segredo conhecido e pior que endpoint fechado.
+INGEST_PUSH_SECRETS = dict(
+    par.split(":", 1) for par in os.getenv("INGEST_PUSH_SECRETS", "").split(",") if ":" in par
+)

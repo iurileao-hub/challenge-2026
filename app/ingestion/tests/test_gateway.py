@@ -84,7 +84,7 @@ def test_adaptador_do_dataset_real(cenario):
         AsensioDatasetAdapter(),
         charge_point_serial=SERIAL,
         limit=50,
-        shift_to="2026-07-01",
+        shift_to="2026-01-05",
     )
 
     assert report.sessions_ingested == 50
@@ -105,7 +105,7 @@ def test_duas_fontes_diferentes_produzem_o_mesmo_tipo_de_sessao(cenario):
     """
     gw = IngestionGateway(cenario["condominium"])
     gw.ingest(SemsStubAdapter(), payload_path=FIXTURES / "sems_payload.json")
-    gw.ingest(AsensioDatasetAdapter(), charge_point_serial=SERIAL, limit=20, shift_to="2026-08-01")
+    gw.ingest(AsensioDatasetAdapter(), charge_point_serial=SERIAL, limit=20, shift_to="2026-01-05")
 
     do_sems = ChargingSession.objects.get(auth_id="RFID-ANA", session_start__month=7)
     do_dataset = ChargingSession.objects.filter(auth_id__startswith="DS-").first()

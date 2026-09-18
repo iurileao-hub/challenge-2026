@@ -58,3 +58,11 @@ quem clonasse o repositório.
 Os parâmetros derivados deste arquivo ficam versionados em
 `app/ingestion/calibration_params.json`, com a proveniência embutida no próprio JSON;
 o script que os deriva é `app/ingestion/calibration.py` (`python -m ingestion.calibration`).
+
+## Histórico real de recarga (Sprint 2)
+
+| Arquivo | No repo? | Conteúdo | Como obter |
+|---|---|---|---|
+| `semsplus_charge_log_2026-06.csv` | **Sim** (2 KB) | As 18 sessões encerradas do HCA G2 SN 57000HPA247L0002 (planta "LAB FIAP Eco Smart Home"), de 31/05 a 25/06/2026: início, fim, energia, "ID do cartão" e porta. Total: 136,66 kWh | Gerado por script a partir da tabela de [`docs/frente-2-sems-plus-acesso.md`](../docs/frente-2-sems-plus-acesso.md), que registra na íntegra a tela "Registo de carregamento" do SEMS+ observada pela equipe em 26/06/2026. É evidência de nível [O] (observação de tela), não resposta de API autenticada. Entra na plataforma por `manage.py ingest semsplus_log` |
+
+Não contém dado pessoal: em todas as sessões o "ID do cartão" é o próprio número de série do carregador (partida automática, sem identificação de usuário).

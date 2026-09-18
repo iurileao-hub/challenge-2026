@@ -117,11 +117,10 @@ def test_regra_pega_energia_acima_da_bateria(cenario):
     assert flag.status == AnomalyFlag.Status.OPEN
 
 
-def test_regra_pega_ociosidade_com_base_na_telemetria(cenario):
-    """Ociosidade sai da telemetria (quando a potencia zerou), nao da sessao."""
-    s = cenario["sessions"][1001]
+def _carregou_uma_hora_e_ficou(s):
+    """Telemetria: potencia ate 1 h depois do inicio, zero dai em diante."""
     inicio = s.session_start
-    # Carregou 1 h, ficou plugado ate o fim (quase 8 h) -- carro-tampao.
+    TelemetryReading.objects.filter(session=s).delete()
     TelemetryReading.objects.create(
         charge_point=s.charge_point, session=s, ts=inicio + timedelta(hours=1),
         kind=TelemetryReading.Kind.METER_VALUE,
@@ -135,12 +134,51 @@ def test_regra_pega_ociosidade_com_base_na_telemetria(cenario):
         energy_kwh_total=Decimal("1018.400"),
     )
 
+
+def test_regra_pega_ociosidade_com_base_na_telemetria(cenario):
+    """Ociosidade sai da telemetria (quando a potencia zerou), nao da sessao.
+
+    De dia: carregou 1 h e segurou a vaga das 10h as 17h55. Carro-tampao."""
+    s = cenario["sessions"][1001]
+    tz = ZoneInfo("America/Sao_Paulo")
+    s.session_start = datetime(2026, 6, 3, 9, 0, tzinfo=tz)
+    s.session_end = datetime(2026, 6, 3, 17, 55, tzinfo=tz)
+    s.save(update_fields=["session_start", "session_end"])
+    _carregou_uma_hora_e_ficou(s)
+
     run_detection(cenario["condominium"], *janela(date(2026, 6, 1), date(2026, 6, 30)),
                   use_isolation_forest=False)
     flag = AnomalyFlag.objects.get(session=s, category="idle")
 
     assert "conectado após concluir" in flag.explanation
     assert s.duration_hours - 1 > IDLE_HOURS_THRESHOLD
+
+
+def test_pernoitar_plugado_nao_e_carro_tampao(cenario):
+    """O MESMO padrao, a noite: plugou as 22h10, carregou 1 h, saiu as 6h05.
+
+    Sao sete horas "ociosas" em que ninguem foi impedido de carregar. E o uso
+    mais comum de um predio, e o mais desejavel (fora do pico). A regra antiga,
+    calibrada num estacionamento de escritorio, acusaria esse morador."""
+    s = cenario["sessions"][1001]           # 02/06 22:10 -> 03/06 06:05
+    _carregou_uma_hora_e_ficou(s)
+
+    run_detection(cenario["condominium"], *janela(date(2026, 6, 1), date(2026, 6, 30)),
+                  use_isolation_forest=False)
+
+    assert not AnomalyFlag.objects.filter(session=s, category="idle").exists()
+
+
+def test_so_conta_a_ociosidade_fora_do_pernoite():
+    from core.policy import contended_hours
+
+    tz = ZoneInfo("America/Sao_Paulo")
+    h = lambda d, hh, mm=0: datetime(2026, 6, d, hh, mm, tzinfo=tz)   # noqa: E731
+    assert contended_hours(h(2, 23, 10), h(3, 6, 5), tz) == 0.0       # toda no pernoite
+    assert contended_hours(h(3, 10), h(3, 17), tz) == 7.0             # toda em horario de uso
+    assert contended_hours(h(2, 19), h(3, 9), tz) == 5.0              # 19-22h e 7-9h
+    assert contended_hours(h(2, 12), h(4, 12), tz) == 30.0            # dois dias: 48 h - 2 x 9 h
+    assert contended_hours(h(3, 9), h(3, 9), tz) == 0.0
 
 
 def test_regra_pega_leitura_perdida(cenario):

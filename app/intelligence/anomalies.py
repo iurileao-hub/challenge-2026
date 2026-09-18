@@ -29,11 +29,11 @@ import numpy as np
 from django.db.models import Count, Q
 
 from core.models import AnomalyFlag, ChargePoint, ChargingSession, TelemetryReading
+from core.policy import IDLE_HOURS_THRESHOLD, QUIET_END, QUIET_START
 from intelligence.features import SessionFeatures, extract, to_frame
 
 # Limiares da fase 1. Ficam explicitos aqui, e nao espalhados no codigo, porque
 # sao parametro de politica do condominio -- o sindico pode querer mexer.
-IDLE_HOURS_THRESHOLD = 4.0
 CONSUMPTION_VS_MEDIAN = 3.0
 POWER_DEGRADATION_RATIO = 0.6
 HEARTBEAT_GAP_HOURS = 3.0
@@ -98,13 +98,22 @@ def _rule_idle(f: SessionFeatures) -> Detection | None:
     """
     if not f.has_telemetry:
         return None
-    if f.idle_hours >= IDLE_HOURS_THRESHOLD:
+    # So conta a ociosidade FORA da janela de pernoite (`core.policy`): o carro
+    # que termina as 23h30 e sai as 7h nao tirou a vez de ninguem.
+    if f.idle_contended_hours >= IDLE_HOURS_THRESHOLD:
+        pernoite = f.idle_hours - f.idle_contended_hours
+        complemento = (
+            f" Outras {pernoite:.1f} h ociosas caíram no pernoite "
+            f"({QUIET_START:%Hh} às {QUIET_END:%Hh}) e não contam."
+            if pernoite >= 0.5 else ""
+        )
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="idle",
             explanation=(
-                f"Veículo permaneceu {f.idle_hours:.1f} h conectado após concluir a "
-                f"recarga (carregou {f.charging_hours:.1f} h de {f.plugged_hours:.1f} h "
-                "plugado). A vaga ficou indisponível sem entregar energia."
+                f"Veículo permaneceu {f.idle_contended_hours:.1f} h conectado após concluir a "
+                f"recarga, em horário de uso (carregou {f.charging_hours:.1f} h de "
+                f"{f.plugged_hours:.1f} h plugado). A vaga ficou indisponível sem entregar "
+                f"energia.{complemento}"
             ),
         )
     return None
@@ -190,7 +199,7 @@ def detect_point_health(condominium, since, until) -> list[Detection]:
 # --------------------------------------------------------------------------
 
 ISOLATION_FEATURES = [
-    "energy_kwh", "plugged_hours", "charging_hours", "idle_hours",
+    "energy_kwh", "plugged_hours", "charging_hours", "idle_contended_hours",
     "kwh_per_hour", "power_ratio", "second_half_power_ratio",
     "start_hour_sin", "start_hour_cos",
 ]
@@ -201,7 +210,7 @@ FEATURE_LEGIVEL = {
     "energy_kwh": ("energia da recarga", "kWh", "consumption"),
     "plugged_hours": ("tempo conectado", "h", "idle"),
     "charging_hours": ("tempo carregando", "h", "consumption"),
-    "idle_hours": ("tempo conectado sem carregar", "h", "idle"),
+    "idle_contended_hours": ("tempo conectado sem carregar, fora do pernoite", "h", "idle"),
     "kwh_per_hour": ("energia por hora conectado", "kWh/h", "consumption"),
     "power_ratio": ("potência em relação à nominal do ponto", "×", "power_degradation"),
     "second_half_power_ratio": ("potência da 2ª metade em relação à 1ª", "×", "power_degradation"),

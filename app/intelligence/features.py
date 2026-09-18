@@ -16,6 +16,7 @@ from django.db.models import Max, Q
 
 from billing.competence import condo_tz
 from core.models import ChargingSession, TelemetryReading
+from core.policy import contended_hours
 
 
 @dataclass
@@ -37,6 +38,8 @@ class SessionFeatures:
     meter_consistent: bool
     second_half_power_ratio: float  # potencia da 2a metade / 1a metade
     has_telemetry: bool = True      # False = nao ha base para julgar ociosidade
+    #: horas ociosas FORA da janela de pernoite -- e o que a regra julga
+    idle_contended_hours: float = 0.0
 
 
 def _charging_end(session: ChargingSession):
@@ -113,6 +116,10 @@ def extract(sessions) -> list[SessionFeatures]:
                 plugged_hours=plugged,
                 charging_hours=charging,
                 idle_hours=max(plugged - charging, 0.0),
+                idle_contended_hours=(
+                    contended_hours(charge_end, s.session_end, condo_tz())
+                    if s.session_end else 0.0
+                ),
                 kwh_per_hour=(energy / charging if charging > 0.05 else 0.0),
                 max_power_kw=max_power,
                 # Potencia maxima nao informada e NaN, nao zero: "a fonte nao

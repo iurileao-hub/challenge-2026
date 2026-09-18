@@ -423,7 +423,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 81 testes
+uv run pytest                    # 83 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -433,7 +433,7 @@ Distribuição da suíte:
 |---|---|---|
 | `billing/tests/test_mes_ficticio.py` | 19 | A suíte de aceitação: reproduz o mês fictício do dossiê, e fixa a convenção de arredondamento |
 | `portal/tests/test_portal.py` | 25 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), recarga sem dono até a fatura |
-| `intelligence/tests/test_deteccao.py` | 13 | Detecção nas duas fases, o ciclo de estados da fatura, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria e o alerta de fila |
+| `intelligence/tests/test_deteccao.py` | 15 | Detecção nas duas fases, o ciclo de estados da fatura, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria, o alerta de fila e a janela de pernoite na regra de ociosidade |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
 | `ingestion/tests/test_robustez.py` | 19 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado, as 18 sessões reais do HCA G2, e os invariantes de banco |
 
@@ -482,6 +482,14 @@ armazenado jogaria a sessão para julho e erraria a fatura em R$ 20,16.
 **Vigências sem sobreposição são garantidas pelo banco**, com `EXCLUSION CONSTRAINT` e
 `btree_gist`. Um `CHECK` não daria conta: a regra fala de pares de linhas, e `CHECK` só
 enxerga a linha corrente.
+
+**Pernoitar plugado não é ocupar a vaga.** A regra de ociosidade só conta as horas paradas
+fora da janela de pernoite (22h às 7h, parâmetro de política em `core/policy.py`). Ociosidade
+só é problema quando impede alguém de carregar, e o uso típico de um prédio é plugar à noite
+e descer de manhã. A primeira versão media ociosidade como num estacionamento de escritório,
+que é de onde vem o dataset de calibração, e acusaria o comportamento mais comum e mais
+desejável de um morador, que é recarregar fora do pico. O gabarito do gerador segue a mesma
+política: ociosidade injetada que cai no pernoite não entra como anomalia.
 
 **O modelo de previsão é escolhido por medição, não por preferência.** O gradient boosting
 é treinado e comparado com a média por dia da semana num backtest de 14 dias. Se perder, a

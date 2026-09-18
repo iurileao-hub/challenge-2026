@@ -29,6 +29,7 @@ from django.db import transaction
 
 from billing.competence import condo_tz
 from billing.money import round2, round3
+from core.policy import IDLE_HOURS_THRESHOLD, contended_hours
 from core.models import (
     ChargingSession,
     Condominium,
@@ -416,6 +417,14 @@ class SyntheticGenerator:
         session = self._report.sessions[-1]
 
         truth = None
+        idle_disputado = contended_hours(
+            start_moment + timedelta(hours=charging_hours), session_end, self.tz
+        )
+        if anomaly == "idle" and not self.spread and idle_disputado < IDLE_HOURS_THRESHOLD + 0.5:
+            # A ociosidade injetada caiu no pernoite: pela politica do condominio
+            # isto e um morador que deixou o carro na vaga ate de manha, nao um
+            # carro-tampao. Nao entra no gabarito como anomalia.
+            anomaly = None
         if anomaly:
             truth = GroundTruth(
                 session_id=session.id,
@@ -423,12 +432,12 @@ class SyntheticGenerator:
                 category=anomaly,
                 detail={
                     "consumption": f"energia {energy_dec} kWh acima da capacidade da bateria ({capacity:.1f} kWh)",
-                    "idle": f"{plugged_hours - charging_hours:.1f} h plugado sem carregar",
+                    "idle": f"{idle_disputado:.1f} h plugado sem carregar, fora do pernoite",
                     "power_degradation": f"potencia cai a {plan['degraded_to']:.0%} no meio da sessao",
                     "metering": "leitura final do medidor perdida",
                 }[anomaly],
                 magnitude={
-                    "idle": plugged_hours - charging_hours,
+                    "idle": idle_disputado,
                     "power_degradation": plan["degraded_to"],
                 }.get(anomaly),
             )

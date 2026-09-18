@@ -139,6 +139,69 @@ def test_confirmar_anomalia_mantem_a_fatura_retida(client, cenario):
     assert inv.status == Invoice.Status.UNDER_REVIEW
 
 
+def test_painel_separa_cobranca_em_duvida_de_aviso_de_operacao(client, cenario):
+    """Duas filas, porque sao duas perguntas: o valor esta certo? a vaga esta
+    sendo bem usada? So a primeira segura dinheiro, e a tela precisa dizer isso."""
+    sessao = cenario["sessions"][1003]
+    consumo = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.CONSUMPTION, explanation="3x a mediana")
+    sugestao = AnomalyFlag.objects.create(
+        session=cenario["sessions"][1001], category=AnomalyFlag.Category.CONSUMPTION,
+        detector="isolation_forest", explanation="fora do padrao")
+    tampao = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.IDLE, explanation="7 h parado de dia")
+    close_competence(cenario["condominium"], JUNHO, force=True)
+
+    entrar(client, "sindica")
+    resp = client.get("/painel/")
+
+    # Quem ja segura dinheiro vem antes de quem so sugere.
+    assert [a.id for a in resp.context["cobranca"]] == [consumo.id, sugestao.id]
+    assert [a.id for a in resp.context["operacao"]] == [tampao.id]
+    html = resp.content.decode()
+    assert "Cobranças em dúvida" in html and "Avisos de operação" in html
+    assert "Reter para conferir" in html            # a sugestao nao retem sozinha
+    assert "Nenhuma fatura é retida por isso" in html
+
+
+def test_promover_sugestao_retem_e_o_desfecho_libera(client, cenario):
+    sessao = cenario["sessions"][1003]
+    flag = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.CONSUMPTION,
+        detector="isolation_forest", explanation="fora do padrao historico")
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+    assert inv.status == Invoice.Status.CLOSED
+
+    entrar(client, "sindica")
+    client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "accepted"})
+    inv.refresh_from_db()
+    assert inv.status == Invoice.Status.UNDER_REVIEW
+    assert inv.lines.get(session=sessao).flagged_for_audit is True
+
+    client.post(f"/painel/anomalia/{flag.id}/resolver/", {"desfecho": "conferido com o morador"})
+    inv.refresh_from_db()
+    assert inv.status == Invoice.Status.CLOSED
+    assert inv.total_amount == Decimal("72.33")
+
+
+def test_confirmar_aviso_de_operacao_nao_toca_na_fatura(client, cenario):
+    sessao = cenario["sessions"][1003]
+    flag = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.IDLE, explanation="7 h parado de dia")
+    close_competence(cenario["condominium"], JUNHO, force=True)
+
+    entrar(client, "sindica")
+    resp = client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "accepted"}, follow=True)
+
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+    assert inv.status == Invoice.Status.CLOSED
+    assert "Nenhuma cobrança foi retida" in resp.content.decode()
+    # O caso confirmado continua exigindo desfecho: so nao ha dinheiro preso nele.
+    flag.refresh_from_db()
+    assert flag.status == AnomalyFlag.Status.ACCEPTED
+
+
 def test_leitura_perdida_nao_e_liberada_por_decisao_sobre_outra_flag(cenario, client):
     """A marcacao por telemetria perdida vem do motor, nao da IA: descartar uma
     flag de OUTRO assunto nao apaga o motivo estrutural da auditoria."""

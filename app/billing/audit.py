@@ -7,7 +7,12 @@ dois chamam daqui.
 
 Uma sessao segura a sua linha por dois caminhos, ambos da Sprint 1:
 
-1. **Anomalia sem desfecho** (Opcao B): flag aberta, contestada ou confirmada.
+1. **Anomalia sem desfecho que duvida do NUMERO cobrado** (Opcao B): medicao,
+   consumo impossivel ou atipico, contestacao do morador. Ociosidade, potencia
+   degradada e saude do ponto NAO seguram: o kWh cobrado esta certo, o problema
+   e de convivencia ou de manutencao, e vai para a fila operacional. Achado da
+   fase 2 (Isolation Forest) e sugestao: so segura depois que o gestor o
+   confirma. A regra mora em `AnomalyFlag.holds_billing`.
 2. **Leitura final perdida** (Opcao A, caso degenerado): a cobranca usou a ultima
    leitura periodica, o valor mais conservador, e vai para conferencia humana.
    Conferencia que TERMINA: quando o gestor encerra a flag de medicao daquela
@@ -25,7 +30,7 @@ def held_session_ids(session_ids) -> set[int]:
     """Das sessoes dadas, quais estao retidas. Duas consultas, nao N."""
     ids = list(session_ids)
     held = set(
-        AnomalyFlag.objects.filter(session_id__in=ids, status__in=AnomalyFlag.HOLDING)
+        AnomalyFlag.objects.filter(session_id__in=ids).holding()
         .values_list("session_id", flat=True)
     )
     leitura_aceita = set(

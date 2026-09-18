@@ -72,8 +72,12 @@ class Command(BaseCommand):
         )
         w(f"      {len(novas)} anomalia(s) nova(s) nesta rodada · {do_mes.count()} registrada(s) no mes, "
           f"{do_mes.filter(status__in=AnomalyFlag.AWAITING).count()} a espera de decisao")
-        for f in (novas or list(do_mes.filter(status__in=AnomalyFlag.AWAITING)))[:5]:
-            w(f"        · [{f.category} · {f.detector}] {f.explanation[:92]}")
+        # So segura fatura o que duvida do NUMERO cobrado. O resto informa.
+        w(f"      {do_mes.holding().count()} seguram cobranca (duvida sobre o valor) · "
+          "as demais sao aviso de operacao ou sugestao, e nao retem fatura")
+        for f in (novas or list(do_mes.filter(status__in=AnomalyFlag.AWAITING)))[:6]:
+            efeito = "RETEM" if f.holds_billing else ("sugere" if f.is_suggestion else "avisa")
+            w(f"        · [{efeito} · {f.category} · {f.detector}] {f.explanation[:84]}")
 
         w(self.style.MIGRATE_HEADING(f"\n[3/5] Fechamento do rateio — {comp}"))
         try:

@@ -1,0 +1,91 @@
+{% comment %}Uma fila do sindico. Usada duas vezes no painel: cobrancas em duvida e
+avisos de operacao. O que muda de uma linha para outra e a CONSEQUENCIA de cada
+botao, e ela sai de `holds_billing` / `doubts_billing` (core.models.AnomalyFlag),
+nao de regra repetida aqui.{% endcomment %}
+<div class="rolagem">
+  <table class="empilha">
+    <tr class="cabecalho">
+      <th>Quando</th><th>Quem</th><th>Tipo</th><th>O que aconteceu</th><th class="num">Sua decisão</th>
+    </tr>
+    {% for a in linhas %}
+    <tr>
+      <td data-rotulo="Quando" style="white-space:nowrap">
+        {% if a.session %}{{ a.session.session_start|date:"d/m \à\s H:i" }}{% else %}—{% endif %}
+      </td>
+      <td data-rotulo="Quem">
+        {% if a.session.credential %}
+          {{ a.session.credential.user.name }}
+          <span style="color:var(--ink-soft)">· unidade {{ a.session.credential.user.unit.label }}</span>
+        {% else %}
+          {{ a.charge_point.serial_number|default:"ponto de recarga" }}
+        {% endif %}
+      </td>
+      <td data-rotulo="Tipo">
+        {% if a.status == 'contested' %}<span class="selo perigo">Contestação do morador</span>
+        {% else %}<span class="selo {% if a.category == 'health' %}perigo{% else %}aviso{% endif %}">{{ a.get_category_display }}</span>{% endif %}
+        {% if a.is_suggestion %}<span class="selo neutro">Sugestão</span>{% endif %}
+      </td>
+      <td data-rotulo="O que aconteceu" class="solo">
+        {{ a.explanation }}
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:5px">
+          Detectado por: {{ a.detector_legivel }}
+          {% if a.is_suggestion and a.doubts_billing %}· não retém a fatura enquanto você não confirmar{% endif %}
+        </div>
+      </td>
+      <td data-rotulo="Sua decisão" class="solo">
+        <div class="decisao">
+          {% if a.holds_billing %}
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}"
+                  onsubmit="return confirm('Confirmar que a cobrança {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}fica retida até o caso se resolver?')">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="accepted" class="reter">É um problema real</button>
+            </form>
+            <div class="consequencia">A cobrança segue retida até você registrar o desfecho do caso.</div>
+          </div>
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}"
+                  onsubmit="return confirm('Liberar a fatura {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}para fechamento? Esta decisão fica registrada no seu nome.')">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="dismissed" class="liberar">Está tudo certo</button>
+            </form>
+            <div class="consequencia">A marcação sai e a fatura fica liberada para fechar.</div>
+          </div>
+          {% elif a.doubts_billing %}
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}"
+                  onsubmit="return confirm('Reter a cobrança {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}para conferência? Ela só é liberada quando você registrar o desfecho.')">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="accepted" class="reter">Reter para conferir</button>
+            </form>
+            <div class="consequencia">A cobrança passa a ficar retida até você registrar o desfecho.</div>
+          </div>
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="dismissed" class="liberar">Descartar sugestão</button>
+            </form>
+            <div class="consequencia">Nada muda na fatura. A decisão fica registrada no seu nome.</div>
+          </div>
+          {% else %}
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="accepted" class="reter">É um problema real</button>
+            </form>
+            <div class="consequencia">Fica nos casos confirmados até você registrar o que foi feito.</div>
+          </div>
+          <div class="opcao">
+            <form method="post" action="{% url 'revisar_anomalia' a.id %}">
+              {% csrf_token %}
+              <button type="submit" name="decisao" value="dismissed" class="liberar">Está tudo certo</button>
+            </form>
+            <div class="consequencia">O aviso sai da fila. Nenhuma fatura depende dele.</div>
+          </div>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="83 testes" src="https://img.shields.io/badge/testes-83%20passando-2ea44f?style=flat-square">
+  <img alt="92 testes" src="https://img.shields.io/badge/testes-92%20passando-2ea44f?style=flat-square">
   <img alt="14 entidades" src="https://img.shields.io/badge/esquema-14%20entidades-0f6b4f?style=flat-square">
   <img alt="Detecção de anomalias medida por curva de sensibilidade" src="https://img.shields.io/badge/detecção%20de%20anomalias-medida%20por%20curva%20de%20sensibilidade-0f6b4f?style=flat-square">
   <img alt="Sprint 2 entregue" src="https://img.shields.io/badge/Sprint%202-entregue-2ea44f?style=flat-square">
@@ -19,7 +19,7 @@
 Enterprise Challenge 2026, Sprints 1 e 2: a pesquisa, o desenho e a implementação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável. A Sprint 1 produziu os três dossiês de pesquisa e o contrato de arquitetura; a Sprint 2 implementou a plataforma, que roda em [`app/`](app/).
 
 > [!IMPORTANT]
-> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **83 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
+> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **92 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
 
 ### Dois READMEs, dois propósitos
 
@@ -222,7 +222,7 @@ possível linha a linha.
 O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
-escrito meses antes do código, e não lidos da implementação. São 83 testes no total.
+escrito meses antes do código, e não lidos da implementação. São 92 testes no total.
 
 ### O que a implementação ensinou e a pesquisa não tinha visto
 
@@ -270,6 +270,19 @@ A detecção roda **antes do fechamento da fatura**: a linha suspeita entra marc
 vai para o estado de auditoria. Há um teste cujo único propósito é sustentar essa afirmação.
 Se alguém remover a detecção, ele quebra por quebrar o ciclo de estados da fatura, não por
 faltar um gráfico.
+
+**Reter pelo que se duvida, e não por quem detectou.** Na revisão final vimos que toda anomalia
+sem desfecho segurava a fatura, inclusive carro-tampão e carregador fraco. Nos dois casos o
+problema é real e o kWh cobrado está certo, de modo que reter a cobrança punia no lugar
+errado. Agora só segura a linha o achado que põe o número em dúvida: medição, energia acima
+do que a bateria comporta, consumo muito acima do histórico da credencial, contestação do
+morador. Ociosidade, potência degradada e saúde do ponto vão para uma fila de operação, que
+não trava o dinheiro de ninguém. O achado do Isolation Forest entra como sugestão e só passa
+a reter quando o síndico confirma: a curva de sensibilidade mostra a fase 2 sinalizando cerca
+de um décimo dos casos que a política manda deixar passar, o que serve para chamar atenção e
+é pouco para segurar dinheiro. A mesma curva mostra onde ela rende, que é na degradação de
+potência ainda aquém do limiar, ou seja, em manutenção preditiva. Na demonstração, as faturas
+retidas caíram de cinco para duas, e as duas são dúvidas sobre valor.
 
 Duas decisões reforçam a mesma tese. A previsão declara o método e o erro do backtest **na
 própria tela**, e quando o gradient boosting perde da média por dia da semana a plataforma

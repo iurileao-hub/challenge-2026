@@ -161,7 +161,14 @@ def painel(request):
 
     # A fila e tudo o que ESPERA decisao: o que a deteccao abriu e o que o
     # morador contestou. Listar so `open` deixava a contestacao sem destinatario.
-    anomalias = _flags_do_condo(condo).filter(status__in=AnomalyFlag.AWAITING).order_by("-created_at")
+    anomalias = list(_flags_do_condo(condo).filter(status__in=AnomalyFlag.AWAITING).order_by("-created_at"))
+    # Duas filas, porque sao duas perguntas: o VALOR esta certo? (segura a
+    # linha) e a VAGA / o EQUIPAMENTO esta bem? (nao segura). Quem separa e o
+    # modelo, nao a tela.
+    # O que ja segura dinheiro vem antes do que so sugere (a ordenacao e
+    # estavel: dentro de cada grupo continua do mais recente ao mais antigo).
+    cobranca = sorted((a for a in anomalias if a.doubts_billing), key=lambda a: not a.holds_billing)
+    operacao = [a for a in anomalias if not a.doubts_billing]
     confirmadas = _flags_do_condo(condo).filter(status=AnomalyFlag.Status.ACCEPTED).order_by("-reviewed_at")
     sem_dono = orphans.orphan_summary(condo)
     quarentena = RawEvent.objects.filter(
@@ -212,7 +219,11 @@ def painel(request):
         "faturas": faturas.count(),
         "em_auditoria": faturas.filter(status=Invoice.Status.UNDER_REVIEW).count(),
         "anomalias": anomalias,
+        "cobranca": cobranca,
+        "cobranca_retendo": any(a.holds_billing for a in cobranca),
+        "operacao": operacao,
         "confirmadas": confirmadas,
+        "confirmadas_retendo": [a for a in confirmadas if a.holds_billing],
         "sem_dono": sem_dono,
         "quarentena": quarentena,
         "previsao": previsao,
@@ -243,6 +254,7 @@ def revisar_anomalia(request, flag_id: int):
         messages.error(request, "Este caso já foi decidido.")
         return redirect("painel")
 
+    retinha = flag.holds_billing
     flag.status = decisao
     flag.reviewed_by_user = _app_user(request)
     flag.reviewed_at = timezone.now()
@@ -250,10 +262,19 @@ def revisar_anomalia(request, flag_id: int):
     if flag.session_id:
         sync_session(flag.session_id)
 
-    if decisao == "accepted":
-        messages.success(request, "Problema confirmado. A cobrança segue retida até você registrar o desfecho do caso.")
-    else:
+    # A mensagem diz o que aconteceu com o DINHEIRO, e isso depende do que a
+    # flag duvidava: so promete retencao ou liberacao quando houve.
+    if decisao == "accepted" and flag.holds_billing:
+        if retinha:
+            messages.success(request, "Problema confirmado. A cobrança segue retida até você registrar o desfecho do caso.")
+        else:
+            messages.success(request, "Sugestão confirmada. A cobrança passa a ficar retida até você registrar o desfecho do caso.")
+    elif decisao == "accepted":
+        messages.success(request, "Problema confirmado. Nenhuma cobrança foi retida: registre o desfecho quando o caso for tratado.")
+    elif retinha:
         messages.success(request, "Caso encerrado sem problema: a cobrança foi liberada. A decisão fica registrada no seu nome.")
+    else:
+        messages.success(request, "Aviso descartado. A decisão fica registrada no seu nome.")
     return redirect("painel")
 
 
@@ -270,13 +291,14 @@ def resolver_anomalia(request, flag_id: int):
         messages.error(request, "Descreva o que foi feito: liberar cobrança retida exige registro.")
         return redirect("painel")
 
+    retinha = flag.holds_billing
     flag.status = AnomalyFlag.Status.RESOLVED
     flag.resolution = desfecho
     flag.resolved_at = timezone.now()
     flag.save(update_fields=["status", "resolution", "resolved_at"])
     if flag.session_id:
         sync_session(flag.session_id)
-    messages.success(request, "Desfecho registrado. A cobrança foi liberada.")
+    messages.success(request, "Desfecho registrado. A cobrança foi liberada." if retinha else "Desfecho registrado.")
     return redirect("painel")
 
 

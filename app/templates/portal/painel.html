@@ -16,10 +16,14 @@ qualquer numero: essa e a pergunta com que o sindico abre o sistema.{% endcommen
       {{ anomalias|length }} decisã{{ anomalias|length|pluralize:"o,es" }} esperando por você
     </div>
     <div class="detalhe">
-      O sistema encontrou algo fora do padrão e <strong>segurou
+      {% if unidades_retidas %}
+      Há dúvida sobre valor cobrado, e o sistema <strong>segurou
       {% if unidades_retidas|length == 1 %}a fatura da unidade {{ unidades_retidas.0 }}
       {% else %}{{ unidades_retidas|length }} faturas{% endif %}</strong>
       antes de cobrar. Nada foi cobrado automaticamente.
+      {% else %}
+      São avisos de operação e sugestões. <strong>Nenhuma fatura está retida</strong> por causa deles.
+      {% endif %}
     </div>
   </div>
   <a class="botao" href="#auditoria">Ver e decidir</a>
@@ -36,8 +40,8 @@ dizendo que esta tudo certo enquanto o dinheiro de alguem esta segurado.{% endco
       {{ em_auditoria }} fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }}
     </div>
     <div class="detalhe">
-      {% if confirmadas %}Você confirmou {{ confirmadas|length }} problema{{ confirmadas|length|pluralize:"s" }}
-      e a cobrança segue segurada até você registrar o desfecho, logo abaixo.
+      {% if confirmadas_retendo %}Você confirmou {{ confirmadas_retendo|length }} problema{{ confirmadas_retendo|length|pluralize:"s" }}
+      de cobrança, que segue segurada até você registrar o desfecho, logo abaixo.
       {% else %}Há cobrança em conferência{% endif %}
       {% if unidades_retidas %}(unidade{{ unidades_retidas|pluralize:"s" }}
       {% for u in unidades_retidas %}{{ u }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}.
@@ -51,8 +55,10 @@ dizendo que esta tudo certo enquanto o dinheiro de alguem esta segurado.{% endco
   <div class="texto">
     <div class="titulo">Tudo em ordem</div>
     <div class="detalhe">
-      Nenhuma pendência. As {{ faturas }} faturas de {{ competencia }} passaram na verificação
-      e estão prontas para fechar.
+      {% if confirmadas %}Nenhuma fatura retida. {{ confirmadas|length }} caso{{ confirmadas|length|pluralize:"s" }}
+      de operação aguarda{{ confirmadas|length|pluralize:"m" }} desfecho, logo abaixo.
+      {% else %}Nenhuma pendência.{% endif %}
+      As {{ faturas }} faturas de {{ competencia }} passaram na verificação e estão prontas para fechar.
     </div>
   </div>
 </div>
@@ -64,6 +70,18 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
   <h2>O que precisa da sua decisão</h2>
 
   {% if anomalias %}
+  {% comment %}Duas filas, porque sao duas perguntas. "Este valor esta certo?"
+  segura dinheiro; "esta vaga / este carregador esta sendo bem usado?" nao
+  segura, porque o kWh cobrado nao esta em questao.{% endcomment %}
+  {% if cobranca %}
+  <h3>Cobranças em dúvida</h3>
+  <p class="legenda" style="margin-top:4px">
+    O valor cobrado está em questão: medição, consumo fora do possível ou contestação do
+    morador. A linha fica retida até você decidir. O que vem marcado como
+    <span class="selo neutro">Sugestão</span> é comparação estatística: chama a sua atenção e
+    só retém a cobrança se você confirmar.
+  </p>
+  {% if cobranca_retendo %}
   {% comment %}A tese do produto desenhada: a maquina fez as quatro primeiras
   etapas sozinha e parou na quinta, que e de gente.{% endcomment %}
   <div class="trilha" role="img"
@@ -74,59 +92,19 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
     <div class="etapa">Fatura<br>retida</div>
     <div class="etapa agora">Sua<br>decisão</div>
   </div>
+  {% endif %}
+  {% include "portal/_fila_anomalias.html" with linhas=cobranca %}
+  {% endif %}
 
-  <div class="rolagem">
-    <table class="empilha">
-      <tr class="cabecalho">
-        <th>Quando</th><th>Quem</th><th>Tipo</th><th>O que aconteceu</th><th class="num">Sua decisão</th>
-      </tr>
-      {% for a in anomalias %}
-      <tr>
-        <td data-rotulo="Quando" style="white-space:nowrap">
-          {% if a.session %}{{ a.session.session_start|date:"d/m \à\s H:i" }}{% else %}—{% endif %}
-        </td>
-        <td data-rotulo="Quem">
-          {% if a.session.credential %}
-            {{ a.session.credential.user.name }}
-            <span style="color:var(--ink-soft)">· unidade {{ a.session.credential.user.unit.label }}</span>
-          {% else %}
-            {{ a.charge_point.serial_number|default:"ponto de recarga" }}
-          {% endif %}
-        </td>
-        <td data-rotulo="Tipo">
-          {% if a.status == 'contested' %}<span class="selo perigo">Contestação do morador</span>
-          {% else %}<span class="selo {% if a.category == 'health' %}perigo{% else %}aviso{% endif %}">{{ a.get_category_display }}</span>{% endif %}
-        </td>
-        <td data-rotulo="O que aconteceu" class="solo">
-          {{ a.explanation }}
-          <div style="font-size:12px;color:var(--ink-soft);margin-top:5px">
-            Detectado por: {{ a.detector_legivel }}
-          </div>
-        </td>
-        <td data-rotulo="Sua decisão" class="solo">
-          <div class="decisao">
-            <div class="opcao">
-              <form method="post" action="{% url 'revisar_anomalia' a.id %}"
-                    onsubmit="return confirm('Confirmar que a cobrança {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}fica retida até o caso se resolver?')">
-                {% csrf_token %}
-                <button type="submit" name="decisao" value="accepted" class="reter">É um problema real</button>
-              </form>
-              <div class="consequencia">A cobrança segue retida até você registrar o desfecho do caso.</div>
-            </div>
-            <div class="opcao">
-              <form method="post" action="{% url 'revisar_anomalia' a.id %}"
-                    onsubmit="return confirm('Liberar a fatura {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}para fechamento? Esta decisão fica registrada no seu nome.')">
-                {% csrf_token %}
-                <button type="submit" name="decisao" value="dismissed" class="liberar">Está tudo certo</button>
-              </form>
-              <div class="consequencia">A marcação sai e a fatura fica liberada para fechar.</div>
-            </div>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% if operacao %}
+  <h3 {% if cobranca %}style="margin-top:26px"{% endif %}>Avisos de operação</h3>
+  <p class="legenda" style="margin-top:4px">
+    O valor cobrado está certo. O problema é de uso da vaga ou do equipamento: carro parado
+    sem carregar, carregador entregando menos do que devia, ponto sem sinal.
+    <strong>Nenhuma fatura é retida por isso.</strong>
+  </p>
+  {% include "portal/_fila_anomalias.html" with linhas=operacao %}
+  {% endif %}
 
   <p class="legenda">
     A verificação roda <strong>antes</strong> do fechamento da fatura. Nenhuma decisão é
@@ -149,14 +127,16 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
   {% if confirmadas %}
   <h3 style="margin-top:26px">Casos confirmados, à espera de desfecho</h3>
   <p class="legenda" style="margin-top:4px">
-    Você disse que o problema é real. A cobrança fica retida até você registrar o que foi
-    feito: cobrar assim mesmo, corrigir o valor, isentar. O texto entra na trilha de auditoria.
+    Você disse que o problema é real. Quando a dúvida é sobre o valor, a cobrança fica retida
+    até você registrar o que foi feito: cobrar assim mesmo, corrigir, isentar. Nos avisos de
+    operação o desfecho só encerra o caso. O texto entra na trilha de auditoria.
   </p>
   {% for a in confirmadas %}
   <form method="post" action="{% url 'resolver_anomalia' a.id %}" class="desfecho">
     {% csrf_token %}
     <div class="caso">
       <span class="selo aviso">{{ a.get_category_display }}</span>
+      {% if a.holds_billing %}<span class="selo perigo">cobrança retida</span>{% endif %}
       {% if a.session.credential %}<strong>unidade {{ a.session.credential.user.unit.label }}</strong> ·{% endif %}
       {{ a.explanation }}
       <span style="color:var(--ink-soft)">· confirmado por {{ a.reviewed_by_user.name|default:"gestor" }}
@@ -164,8 +144,8 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
     </div>
     <label class="sr-only" for="desfecho-{{ a.id }}">Desfecho do caso</label>
     <input id="desfecho-{{ a.id }}" name="desfecho" maxlength="500" required
-           placeholder="O que foi feito? Ex.: conferido com o morador, cobrança mantida.">
-    <button type="submit" class="liberar">Registrar desfecho e liberar</button>
+           placeholder="{% if a.holds_billing %}O que foi feito? Ex.: conferido com o morador, cobrança mantida.{% else %}O que foi feito? Ex.: morador avisado; técnico acionado.{% endif %}">
+    <button type="submit" class="liberar">{% if a.holds_billing %}Registrar desfecho e liberar{% else %}Registrar desfecho{% endif %}</button>
   </form>
   {% endfor %}
   {% endif %}

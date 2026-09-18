@@ -98,6 +98,77 @@ def test_sessao_sem_leitura_final_vai_para_auditoria_sem_precisar_de_ia(cenario)
 
 
 # --------------------------------------------------------------------------
+# Reter pelo que se duvida, nao por quem detectou
+# --------------------------------------------------------------------------
+
+def test_consulta_e_propriedade_concordam_sobre_quem_retem(cenario):
+    """A regra de retencao existe em duas formas: consulta (o motor de rateio
+    pergunta ao banco) e propriedade (a tela pergunta ao objeto). Duas formas da
+    mesma regra divergem no primeiro ajuste; aqui todas as combinacoes de
+    categoria x detector x situacao passam pelas duas."""
+    sessao = cenario["sessions"][1003]
+    for categoria in AnomalyFlag.Category.values:
+        for detector in ("rule", "isolation_forest", "morador"):
+            for situacao in AnomalyFlag.Status.values:
+                AnomalyFlag.objects.create(
+                    session=sessao, category=categoria, detector=detector,
+                    status=situacao, explanation=f"{categoria}/{detector}/{situacao}",
+                )
+
+    pela_consulta = set(AnomalyFlag.objects.holding().values_list("explanation", flat=True))
+    pela_propriedade = {f.explanation for f in AnomalyFlag.objects.all() if f.holds_billing}
+    assert pela_consulta == pela_propriedade
+
+    # Ancoras, para a concordancia nao ser a de dois erros iguais.
+    assert "consumption/rule/open" in pela_consulta
+    assert "metering/rule/accepted" in pela_consulta
+    assert "consumption/morador/contested" in pela_consulta
+    assert "consumption/isolation_forest/accepted" in pela_consulta
+    assert "consumption/isolation_forest/open" not in pela_consulta
+    assert "idle/rule/open" not in pela_consulta
+    assert "power_degradation/rule/accepted" not in pela_consulta
+    assert "health/rule/open" not in pela_consulta
+    assert "consumption/rule/resolved" not in pela_consulta
+
+
+@pytest.mark.parametrize("categoria", ["idle", "power_degradation"])
+@pytest.mark.parametrize("situacao", ["open", "accepted"])
+def test_aviso_de_operacao_nao_segura_a_fatura(cenario, categoria, situacao):
+    """Carro-tampao e carregador fraco sao problemas reais, e nenhum dos dois
+    torna errado o kWh cobrado. Vao a fila do sindico; a fatura do vizinho fecha."""
+    sessao = cenario["sessions"][1003]
+    AnomalyFlag.objects.create(
+        session=sessao, category=categoria, status=situacao,
+        explanation="problema de operacao, nao de cobranca",
+    )
+    close_competence(cenario["condominium"], JUNHO)
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+
+    assert inv.lines.get(session=sessao).flagged_for_audit is False
+    assert inv.status == Invoice.Status.CLOSED
+
+
+def test_sugestao_da_fase_2_so_retem_depois_de_confirmada(cenario):
+    """Outlier estatistico diz que a sessao e DIFERENTE, nao o que esta errado.
+    Chama a atencao do sindico; so segura dinheiro depois que ele confirma."""
+    sessao = cenario["sessions"][1003]
+    flag = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.CONSUMPTION,
+        detector="isolation_forest", explanation="fora do padrao historico",
+    )
+    close_competence(cenario["condominium"], JUNHO)
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+    assert inv.status == Invoice.Status.CLOSED
+
+    flag.status = AnomalyFlag.Status.ACCEPTED
+    flag.save(update_fields=["status"])
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+    assert inv.lines.get(session=sessao).flagged_for_audit is True
+    assert inv.status == Invoice.Status.UNDER_REVIEW
+
+
+# --------------------------------------------------------------------------
 # Regras da fase 1
 # --------------------------------------------------------------------------
 

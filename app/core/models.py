@@ -819,6 +819,17 @@ class InvoiceLine(models.Model):
         return f"{self.description}: R$ {self.amount}"
 
 
+class AnomalyFlagQuerySet(models.QuerySet):
+    def holding(self):
+        """As flags que seguram linha de fatura. Espelha `AnomalyFlag.holds_billing`
+        (um teste percorre todas as combinacoes e exige que os dois concordem)."""
+        cls = self.model
+        em_duvida = Q(category__in=cls.BILLING_CATEGORIES)
+        regra = ~Q(detector__in=cls.SUGGESTING_DETECTORS) & Q(status__in=cls.HOLDING)
+        sugestao_promovida = Q(detector__in=cls.SUGGESTING_DETECTORS) & Q(status=cls.Status.ACCEPTED)
+        return self.filter(em_duvida & (regra | sugestao_promovida))
+
+
 class AnomalyFlag(models.Model):
     """Saida da deteccao de anomalias, com explicacao legivel.
 
@@ -854,10 +865,28 @@ class AnomalyFlag(models.Model):
     #
     #: espera decisao do sindico: e a fila do painel
     AWAITING = (Status.OPEN, Status.CONTESTED)
-    #: segura a linha da fatura
+    #: caso sem desfecho. Condicao NECESSARIA para segurar a linha, nao
+    #: suficiente: ver `holds_billing`
     HOLDING = (Status.OPEN, Status.CONTESTED, Status.ACCEPTED)
     #: um humano encerrou o caso, e a linha esta liberada
     RELEASED = (Status.DISMISSED, Status.RESOLVED)
+
+    # Reter pelo QUE SE DUVIDA, nao por quem detectou. Ate a Sprint 2 toda flag
+    # sem desfecho segurava a fatura, e isso punia no lugar errado: carro-tampao
+    # e problema de convivencia, carregador fraco e problema de manutencao, e em
+    # nenhum dos dois o kWh cobrado esta errado. Segurar a cobranca de um vizinho
+    # por isso e usar a fatura como castigo.
+    #
+    #: poem em duvida o NUMERO cobrado -- so estas podem segurar a linha. O
+    #: resto e operacao: vai a fila do sindico e nao trava o dinheiro de ninguem
+    BILLING_CATEGORIES = (Category.CONSUMPTION, Category.METERING)
+    #: detectores cujo achado e SUGESTAO ate um humano confirmar. Outlier
+    #: estatistico nao diz o que esta errado, so que e diferente: a curva de
+    #: sensibilidade (`evaluate_ai`) mede a fase 2 sinalizando cerca de um
+    #: decimo dos casos que a politica manda nao sinalizar (6 de 48 ociosidades
+    #: abaixo de 3 h). E evidencia boa para chamar atencao e fraca para segurar
+    #: dinheiro
+    SUGGESTING_DETECTORS = ("isolation_forest",)
 
     session = models.ForeignKey(
         ChargingSession,
@@ -905,6 +934,8 @@ class AnomalyFlag(models.Model):
     )
     resolved_at = models.DateTimeField("resolvida em", null=True, blank=True)
 
+    objects = AnomalyFlagQuerySet.as_manager()
+
     class Meta:
         db_table = "anomaly_flag"
         verbose_name = "anomalia"
@@ -933,6 +964,24 @@ class AnomalyFlag(models.Model):
     @property
     def detector_legivel(self) -> str:
         return self.DETECTOR_LEGIVEL.get(self.detector, self.detector)
+
+    @property
+    def is_suggestion(self) -> bool:
+        return self.detector in self.SUGGESTING_DETECTORS
+
+    @property
+    def doubts_billing(self) -> bool:
+        """A flag poe em duvida o numero cobrado? Define a FILA em que ela cai."""
+        return self.category in self.BILLING_CATEGORIES
+
+    @property
+    def holds_billing(self) -> bool:
+        """A flag segura a linha AGORA? Espelha `AnomalyFlagQuerySet.holding`."""
+        if not self.doubts_billing:
+            return False
+        if self.is_suggestion:
+            return self.status == self.Status.ACCEPTED
+        return self.status in self.HOLDING
 
     def __str__(self):
         return f"[{self.get_category_display()}] {self.explanation[:60]}"

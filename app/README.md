@@ -423,7 +423,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 83 testes
+uv run pytest                    # 92 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -482,6 +482,16 @@ armazenado jogaria a sessão para julho e erraria a fatura em R$ 20,16.
 **Vigências sem sobreposição são garantidas pelo banco**, com `EXCLUSION CONSTRAINT` e
 `btree_gist`. Um `CHECK` não daria conta: a regra fala de pares de linhas, e `CHECK` só
 enxerga a linha corrente.
+
+**Reter pelo que se duvida, e não por quem detectou.** Uma flag segura a linha da fatura
+quando põe em dúvida o número cobrado (categorias `consumption` e `metering`, o que inclui a
+contestação do morador). Ociosidade, potência degradada e saúde do ponto são avisos de
+operação: aparecem numa fila própria do painel, pedem desfecho como qualquer caso confirmado
+e não retêm cobrança, porque o kWh está certo. Achado do Isolation Forest é sugestão e só
+retém depois de confirmado pelo gestor ("Reter para conferir"). A regra existe em duas
+formas, `AnomalyFlag.holds_billing` (a tela pergunta ao objeto) e
+`AnomalyFlag.objects.holding()` (o motor pergunta ao banco), e um teste percorre todas as
+combinações de categoria, detector e situação exigindo que as duas concordem.
 
 **Pernoitar plugado não é ocupar a vaga.** A regra de ociosidade só conta as horas paradas
 fora da janela de pernoite (22h às 7h, parâmetro de política em `core/policy.py`). Ociosidade

@@ -14,7 +14,7 @@
 
 Três níveis de evidência, mantendo a convenção dos dossiês da Sprint 1:
 
-- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (83 testes).
+- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (92 testes).
 - **Verificado na Sprint 1.** O que se afirma sobre o HCA G2 e o SEMS+ vem dos dossiês já entregues, que citam fonte primária: [`frente-2-regulatorio.md`](frente-2-regulatorio.md) (datasheet e manual G2 V1.5) e [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md) (observação direta da plataforma, nível [O]). Nenhuma fonte nova é citada aqui.
 - **Inferência da equipe.** As arquiteturas propostas são desenho nosso. Não tivemos acesso ao mapa de registradores Modbus do HCA G2 nem à OpenAPI de desenvolvedor do SEMS. Onde uma proposta depende de algo que não pudemos verificar, o texto diz.
 

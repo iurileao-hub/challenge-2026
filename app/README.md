@@ -238,10 +238,12 @@ uma decisão de projeto, não apenas uma tela.
    serve a média e a tela diz que serviu. A honestidade do modelo é parte da interface,
    e nenhum jargão aparece: o síndico precisa conseguir repetir isso em voz alta.
 
-2. **Desça até a fila de auditoria.** Há uma anomalia esperando decisão humana: a
-   sessão da unidade 34 cuja leitura final do medidor não chegou. Note que a fatura da
-   unidade está no estado *Em auditoria*, e não *Fechada*. A detecção rodou **antes** do
-   fechamento, não depois.
+2. **Desça até as duas filas de decisão.** Em *Cobranças em dúvida* estão os casos que
+   põem o valor em questão, a começar pela sessão da unidade 34 cuja leitura final do
+   medidor não chegou: a fatura dela está *Em auditoria*, e não *Fechada*, porque a
+   detecção rodou **antes** do fechamento. Os itens marcados como *Sugestão* vêm da
+   comparação estatística e só retêm se você confirmar. Em *Avisos de operação* ficam
+   ociosidade, potência e saúde do ponto, que não retêm fatura nenhuma.
 
 3. **Confirme ou descarte a anomalia.** O estado da fatura muda; o valor, não. Nenhuma
    saída de IA altera cobrança. A plataforma produz evidência, e quem responde pela
@@ -261,13 +263,9 @@ uma decisão de projeto, não apenas uma tela.
 6. **Entre como `ana`** (unidade 72, o casal com dois veículos). Ana dirige um BYD
    Dolphin e autentica por RFID; Bruno dirige um Volvo EX30 e autentica pelo app. São
    duas pessoas, dois carros e duas credenciais, e o extrato traz as três recargas de
-   junho numa fatura só, com uma única taxa de disponibilidade. A recarga de 10/06 é do
-   Bruno, que não tem login. O caso excepcional do enunciado se resolve pela modelagem,
+   junho numa fatura só, com uma única taxa de disponibilidade, e cada linha diz quem a
+   iniciou. A recarga de 10/06 é do Bruno, que não tem login. O caso excepcional do enunciado se resolve pela modelagem,
    sem regra ad hoc: a fatura é por unidade, não por pessoa.
-
-   > Hoje o extrato não rotula qual credencial iniciou cada recarga. O dado existe
-   > (`InvoiceLine.session.credential`) e a agregação está correta; o que falta é a
-   > exibição.
 
 7. **Volte ao terminal e rode `pipeline --reconciliar` de novo.** A reconciliação
    tarifária em dois tempos aparece no fim: a conta real da distribuidora chegou mais
@@ -432,8 +430,8 @@ Distribuição da suíte:
 | Arquivo | Testes | O que garante |
 |---|---|---|
 | `billing/tests/test_mes_ficticio.py` | 19 | A suíte de aceitação: reproduz o mês fictício do dossiê, e fixa a convenção de arredondamento |
-| `portal/tests/test_portal.py` | 25 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), recarga sem dono até a fatura |
-| `intelligence/tests/test_deteccao.py` | 15 | Detecção nas duas fases, o ciclo de estados da fatura, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria, o alerta de fila e a janela de pernoite na regra de ociosidade |
+| `portal/tests/test_portal.py` | 28 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), as duas filas do painel, promoção de sugestão a retenção, recarga sem dono até a fatura |
+| `intelligence/tests/test_deteccao.py` | 21 | Detecção nas duas fases, o ciclo de estados da fatura, a regra de retenção em todas as combinações de categoria, detector e situação, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria, o alerta de fila e a janela de pernoite na regra de ociosidade |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
 | `ingestion/tests/test_robustez.py` | 19 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado, as 18 sessões reais do HCA G2, e os invariantes de banco |
 

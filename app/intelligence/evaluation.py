@@ -104,3 +104,56 @@ def evaluate(ground_truth, condominium) -> EvaluationReport:
         report.total_true_positives += score.true_positives
 
     return report
+
+
+#: Faixas de intensidade, por categoria, na unidade do limiar da regra.
+#: (rotulo, minimo inclusivo, maximo exclusivo, "a politica manda sinalizar?")
+SENSITIVITY_BINS = {
+    "idle": [
+        ("menos de 3 h ociosas", 0.0, 3.0, False),
+        ("3 a 4 h (logo abaixo do limiar)", 3.0, 4.0, False),
+        ("4 a 5 h (logo acima do limiar)", 4.0, 5.0, True),
+        ("5 h ou mais", 5.0, 99.0, True),
+    ],
+    "power_degradation": [
+        ("potencia cai a menos de 50%", 0.0, 0.50, True),
+        ("cai a 50-60% (logo alem do limiar)", 0.50, 0.60, True),
+        ("cai a 60-75% (aquem do limiar)", 0.60, 0.75, False),
+        ("cai a 75% ou mais", 0.75, 9.0, False),
+    ],
+}
+
+
+def sensitivity(ground_truth, condominium) -> dict[str, list[dict]]:
+    """Taxa de deteccao por faixa de intensidade -- ONDE o detector opera.
+
+    Recall de 100% sobre anomalias injetadas sempre acima do limiar e
+    tautologia: a regra dispara acima de 4 h, o gerador injeta de 5 a 11 h.
+    O numero que informa e o formato da curva. Espera-se ~0% abaixo do limiar
+    (la nao e anomalia, por POLITICA do condominio, nao por falha) e ~100%
+    acima; o que acontece no entorno do limiar mede o erro da propria
+    estimativa de ociosidade, que vem de telemetria amostrada a cada 15 min.
+    """
+    por_detector: dict[str, set] = {"rule": set(), "isolation_forest": set()}
+    for sid, cat, det in AnomalyFlag.objects.filter(
+        session__charge_point__condominium=condominium
+    ).values_list("session_id", "category", "detector"):
+        por_detector.setdefault(det, set()).add((sid, cat))
+
+    out: dict[str, list[dict]] = {}
+    for cat, bins in SENSITIVITY_BINS.items():
+        linhas = []
+        for rotulo, lo, hi, esperado in bins:
+            casos = [
+                g for g in ground_truth
+                if g.category == cat and g.magnitude is not None and lo <= g.magnitude < hi
+            ]
+            regra = sum(1 for g in casos if (g.session_id, cat) in por_detector["rule"])
+            # A fase 2 so olha o que a fase 1 deixou passar; e pode classificar
+            # a sessao em outra categoria. Conta qualquer flag dela na sessao.
+            ids_if = {sid for sid, _ in por_detector["isolation_forest"]}
+            floresta = sum(1 for g in casos if g.session_id in ids_if)
+            linhas.append({"faixa": rotulo, "injetadas": len(casos), "regra": regra,
+                           "floresta": floresta, "deve_sinalizar": esperado})
+        out[cat] = linhas
+    return out

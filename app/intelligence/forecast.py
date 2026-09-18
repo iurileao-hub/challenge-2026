@@ -186,8 +186,72 @@ def forecast(condominium, *, today: date, horizon: int = HORIZON_DAYS) -> Foreca
     return result
 
 
+#: Janela de observacao da disputa pelo conector.
+CONTENTION_WINDOW_DAYS = 28
+#: Recarga que comeca ate este intervalo depois de a anterior terminar, no mesmo
+#: conector: havia alguem esperando o cabo.
+HANDOFF = timedelta(minutes=15)
+
+
+def _contention_alert(condominium, points, result: ForecastResult) -> list[Alert]:
+    """Fila e TEMPO de conector, nao energia.
+
+    O alerta de saturacao acima compara kWh previstos com kWh que o ponto
+    conseguiria entregar em 24 h. Um carregador de 7 kW so "satura" por essa
+    conta acima de 90 kWh/dia -- e um predio nunca chega la, porque muito antes
+    disso o cabo esta ocupado por um carro que ja terminou de carregar. O painel
+    dizia "nenhum risco de fila" com um terco das recargas esperando a vez.
+
+    Aqui a medida e direta, tirada do que ja aconteceu: que fracao do tempo o
+    conector esteve ocupado, e quantas recargas comecaram logo depois de a
+    anterior terminar. A segunda e a evidencia mais forte que o dado oferece:
+    ninguem pluga as 02h40 por acaso, um minuto depois de o vizinho sair.
+    """
+    if not result.days:
+        return []
+    fim = datetime.combine(result.days[0].day, time.min, tzinfo=condo_tz())
+    inicio = fim - timedelta(days=CONTENTION_WINDOW_DAYS)
+    sessoes = list(
+        ChargingSession.objects.filter(
+            charge_point__in=points, session_start__gte=inicio, session_start__lt=fim,
+            session_end__isnull=False,
+        ).order_by("charge_point_id", "session_start").values_list(
+            "charge_point_id", "session_start", "session_end"
+        )
+    )
+    if len(sessoes) < 10:
+        return []
+    ocupadas = sum((e - s).total_seconds() for _, s, e in sessoes) / 3600
+    ocupacao = ocupadas / (len(points) * CONTENTION_WINDOW_DAYS * 24)
+    passagens = sum(
+        1 for (p1, _, e1), (p2, s2, _) in zip(sessoes, sessoes[1:])
+        if p1 == p2 and timedelta(0) <= s2 - e1 <= HANDOFF
+    )
+    if passagens < 5 and ocupacao < 0.35:
+        return []
+
+    declared = float(condominium.declared_power_kw or 0)
+    instalada = sum(float(p.rated_power_kw) for p in points)
+    tipico = max(float(p.rated_power_kw) for p in points)
+    if declared and instalada + tipico <= declared:
+        saida = (f"Um segundo ponto de {tipico:.0f} kW cabe na potência declarada "
+                 f"({instalada + tipico:.0f} de {declared:.0f} kW).")
+    else:
+        saida = ("Um ponto adicional excederia a potência declarada: exige revisão do estudo "
+                 "de demanda (IT-41). Alternativa imediata: janelas de reserva.")
+    return [Alert(
+        kind="contention",
+        severity="critical" if (ocupacao >= 0.5 or passagens >= 15) else "warning",
+        message=(
+            f"Nos últimos {CONTENTION_WINDOW_DAYS} dias, {passagens} de {len(sessoes)} recargas começaram "
+            f"menos de 15 min depois de a anterior terminar: havia gente esperando o cabo. "
+            f"O conector ficou ocupado {ocupacao:.0%} do tempo. {saida}"
+        ),
+    )]
+
+
 def build_alerts(condominium, result: ForecastResult, series: pd.DataFrame) -> list[Alert]:
-    """Os dois alertas da Opcao B: saturacao e limite de potencia."""
+    """Os dois alertas da Opcao B: saturacao e limite de potência."""
     alerts: list[Alert] = []
     points = list(condominium.charge_points.all())
     if not points:
@@ -202,7 +266,7 @@ def build_alerts(condominium, result: ForecastResult, series: pd.DataFrame) -> l
                 message=(
                     f"Demanda prevista para {d.day:%d/%m} ({d.predicted_kwh:.0f} kWh) "
                     f"chega a {d.predicted_kwh / capacity_kwh_day:.0%} da capacidade "
-                    f"pratica do(s) {len(points)} ponto(s). Conflito de fila provavel: "
+                    f"prática do(s) {len(points)} ponto(s). Conflito de fila provável: "
                     "abrir janelas de reserva ou avaliar segundo ponto."
                 ),
             ))
@@ -211,9 +275,11 @@ def build_alerts(condominium, result: ForecastResult, series: pd.DataFrame) -> l
                 kind="saturation", severity="warning", day=d.day,
                 message=(
                     f"Demanda prevista para {d.day:%d/%m} ({d.predicted_kwh:.0f} kWh) "
-                    f"em {d.predicted_kwh / capacity_kwh_day:.0%} da capacidade pratica."
+                    f"em {d.predicted_kwh / capacity_kwh_day:.0%} da capacidade prática."
                 ),
             ))
+
+    alerts.extend(_contention_alert(condominium, points, result))
 
     # --- limite de potencia declarada (Lei 18.403 / IT-41) ---
     declared = float(condominium.declared_power_kw or 0)
@@ -228,8 +294,8 @@ def build_alerts(condominium, result: ForecastResult, series: pd.DataFrame) -> l
             alerts.append(Alert(
                 kind="power_limit", severity="critical",
                 message=(
-                    f"Potencia instalada ({installed:.1f} kW) excede a declarada na "
-                    f"instalacao ({declared:.1f} kW). Regularizar antes da renovacao do "
+                    f"Potência instalada ({installed:.1f} kW) excede a declarada na "
+                    f"instalação ({declared:.1f} kW). Regularizar antes da renovação do "
                     "AVCB -- a IT-41 exige estudo de demanda por profissional habilitado."
                 ),
             ))
@@ -237,9 +303,9 @@ def build_alerts(condominium, result: ForecastResult, series: pd.DataFrame) -> l
             alerts.append(Alert(
                 kind="power_limit", severity="warning",
                 message=(
-                    f"Pico de potencia observado ({peak:.1f} kW) em "
-                    f"{peak / declared:.0%} da potencia declarada ({declared:.1f} kW). "
-                    "Um ponto adicional exigiria revisao do estudo de demanda."
+                    f"Pico de potência observado ({peak:.1f} kW) em "
+                    f"{peak / declared:.0%} da potência declarada ({declared:.1f} kW). "
+                    "Um ponto adicional exigiria revisão do estudo de demanda."
                 ),
             ))
     return alerts

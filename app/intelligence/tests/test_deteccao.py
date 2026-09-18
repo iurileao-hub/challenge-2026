@@ -222,3 +222,69 @@ def test_recall_contra_gabarito_do_gerador(db):
     assert report.overall_recall == 1.0, (
         f"deteccao perdeu anomalias injetadas:\n{report.render()}"
     )
+
+
+def test_gerador_respeita_o_conector_e_o_periodo(db):
+    """Duas propriedades fisicas que a primeira versao do gerador violava.
+
+    Um conector atende um carro por vez (eram 205 pares de sessoes sobrepostas
+    em 366). E a fila do conector nao pode empurrar recarga para fora do periodo
+    pedido: uma sessao de 31/05 adiada para a madrugada de 01/06 entrava na
+    competencia de junho e alterava uma fatura do mes ficticio do dossie.
+    """
+    from django.db import connection
+
+    from core.models import ChargingSession
+    from core.scenarios import build_jardim_aurora
+    from ingestion.generator import SyntheticGenerator
+
+    condo = build_jardim_aurora(extra_residents=True)["condominium"]
+    antes = set(ChargingSession.objects.values_list("id", flat=True))
+    r = SyntheticGenerator(condo, seed=7).generate(date(2026, 4, 1), date(2026, 5, 31))
+
+    with connection.cursor() as c:
+        c.execute(
+            "select count(*) from charging_session a join charging_session b "
+            "on a.charge_point_id = b.charge_point_id and a.id < b.id "
+            "and a.session_start < b.session_end and b.session_start < a.session_end"
+        )
+        assert c.fetchone()[0] == 0
+    novas = ChargingSession.objects.exclude(id__in=antes)
+    assert novas.count() == r.sessions_created > 50
+    assert all(str(Competence.of(s.session_start)) in ("2026-04", "2026-05") for s in novas)
+    assert set(novas.values_list("source", flat=True)) == {"synthetic"}      # entrou pelo gateway
+    assert r.sessions_deferred > 0          # houve disputa pelo conector, e ela foi resolvida
+
+
+def test_fase_2_se_abstem_quando_a_fonte_nao_entrega_telemetria(db):
+    """Desconhecido nao e zero. O historico real do SEMS+ nao traz potencia nem
+    MeterValues; preenchido com 0,0, fez o Isolation Forest acusar 17 das 18
+    recargas reais do HCA G2 de "potencia zero"."""
+    from ingestion.adapters import SemsPlusLogAdapter
+    from ingestion.gateway import IngestionGateway
+
+    condo = build_jardim_aurora(extra_residents=True)["condominium"]
+    SyntheticGenerator(condo, seed=3).generate(date(2026, 4, 1), date(2026, 5, 31))
+    IngestionGateway(condo).ingest(SemsPlusLogAdapter())
+
+    tz = ZoneInfo("America/Sao_Paulo")
+    run_detection(condo, datetime(2026, 5, 25, tzinfo=tz), datetime(2026, 6, 30, 23, 59, tzinfo=tz))
+
+    assert ChargingSession.objects.filter(source="semsplus_log").count() == 18
+    assert not AnomalyFlag.objects.filter(session__source="semsplus_log").exists()
+
+
+def test_alerta_de_fila_olha_tempo_de_conector_e_nao_energia(db):
+    """12 unidades num conector de 7 kW: em kWh o ponto esta folgado, e o painel
+    dizia "nenhum risco de fila". Em tempo de cabo, ha gente esperando."""
+    from intelligence.forecast import forecast
+
+    condo = build_jardim_aurora(extra_residents=True)["condominium"]
+    SyntheticGenerator(condo, seed=11).generate(date(2026, 3, 1), date(2026, 5, 31))
+
+    prev = forecast(condo, today=date(2026, 5, 31))
+
+    fila = [a for a in prev.alerts if a.kind == "contention"]
+    assert len(fila) == 1 and "esperando o cabo" in fila[0].message
+    assert "cabe na potência declarada" in fila[0].message     # 7 + 7 <= 22 kW
+    assert not [a for a in prev.alerts if a.kind == "saturation"]

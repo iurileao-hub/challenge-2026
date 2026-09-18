@@ -50,7 +50,11 @@ def _charging_end(session: ChargingSession):
     fala Modbus TCP -- e tratar silencio como prova acusaria o morador de
     ocupar a vaga por um defeito do equipamento. Sem base, o detector se abstem.
     """
-    tem_leitura = TelemetryReading.objects.filter(session=session).exists()
+    # "Houve telemetria" significa leitura COM potencia. Fonte que entrega
+    # MeterValues so com o acumulado (potencia nula) tambem nao da base: sem
+    # este cuidado o tempo de carga zerava e toda sessao longa era acusada de
+    # ocupar a vaga.
+    tem_leitura = TelemetryReading.objects.filter(session=session, power_kw__isnull=False).exists()
     if not tem_leitura:
         return session.session_end or session.session_start, False
     last = (
@@ -95,7 +99,7 @@ def extract(sessions) -> list[SessionFeatures]:
         max_power = float(s.max_power_kw or 0)
 
         meter_ok = True
-        if s.meter_stop is not None:
+        if s.meter_stop is not None and s.meter_start is not None:
             meter_ok = abs((Decimal(s.meter_stop) - Decimal(s.meter_start)) - Decimal(s.energy_kwh)) <= Decimal("0.05")
 
         out.append(
@@ -111,7 +115,11 @@ def extract(sessions) -> list[SessionFeatures]:
                 idle_hours=max(plugged - charging, 0.0),
                 kwh_per_hour=(energy / charging if charging > 0.05 else 0.0),
                 max_power_kw=max_power,
-                power_ratio=(max_power / nominal if nominal else 0.0),
+                # Potencia maxima nao informada e NaN, nao zero: "a fonte nao
+                # disse" e "o carregador nao entregou nada" sao fatos opostos.
+                power_ratio=(
+                    max_power / nominal if (nominal and s.max_power_kw is not None) else float("nan")
+                ),
                 battery_capacity_kwh=capacity,
                 energy_over_battery=(energy / capacity if capacity > 0 else 0.0),
                 meter_consistent=meter_ok,

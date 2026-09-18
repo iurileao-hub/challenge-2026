@@ -38,6 +38,11 @@ CONSUMPTION_VS_MEDIAN = 3.0
 POWER_DEGRADATION_RATIO = 0.6
 HEARTBEAT_GAP_HOURS = 3.0
 MIN_HISTORY_FOR_MEDIAN = 5
+#: Quanto passado entra como CONTEXTO da janela analisada. "Consumo atipico para
+#: esta credencial" so tem sentido contra o historico dela -- e um mes isolado
+#: raramente tem as 5 sessoes por credencial (ou as 30 do Isolation Forest) que
+#: a comparacao exige. Sem isto, no mes da demonstracao a fase 2 nunca rodava.
+HISTORY_DAYS = 180
 
 
 @dataclass
@@ -122,7 +127,7 @@ def _rule_power_degradation(f: SessionFeatures) -> Detection | None:
 
 def _rule_metering(f: SessionFeatures, session: ChargingSession) -> Detection | None:
     """Leitura final perdida ou medidor inconsistente."""
-    if session.meter_stop is None:
+    if session.final_reading_lost:
         return Detection(
             session_id=f.session_id, charge_point_id=None, category="metering",
             explanation=(
@@ -186,11 +191,26 @@ def detect_point_health(condominium, since, until) -> list[Detection]:
 
 ISOLATION_FEATURES = [
     "energy_kwh", "plugged_hours", "charging_hours", "idle_hours",
-    "kwh_per_hour", "power_ratio", "second_half_power_ratio", "start_hour",
+    "kwh_per_hour", "power_ratio", "second_half_power_ratio",
+    "start_hour_sin", "start_hour_cos",
 ]
 
+#: Como cada caracteristica aparece para quem le a fila: (rotulo, unidade,
+#: categoria da anomalia). Nome de coluna na tela do sindico e codigo vazando.
+FEATURE_LEGIVEL = {
+    "energy_kwh": ("energia da recarga", "kWh", "consumption"),
+    "plugged_hours": ("tempo conectado", "h", "idle"),
+    "charging_hours": ("tempo carregando", "h", "consumption"),
+    "idle_hours": ("tempo conectado sem carregar", "h", "idle"),
+    "kwh_per_hour": ("energia por hora conectado", "kWh/h", "consumption"),
+    "power_ratio": ("potência em relação à nominal do ponto", "×", "power_degradation"),
+    "second_half_power_ratio": ("potência da 2ª metade em relação à 1ª", "×", "power_degradation"),
+    "start_hour_sin": ("horário de início", "", "consumption"),
+    "start_hour_cos": ("horário de início", "", "consumption"),
+}
 
-def detect_isolation_forest(features: list[SessionFeatures], contamination: float = 0.05):
+
+def detect_isolation_forest(features: list[SessionFeatures], only_ids: set[int] | None = None):
     """Isolation Forest sobre as features da sessao.
 
     Escolhido em vez de um autoencoder ou de um modelo profundo por tres
@@ -198,43 +218,83 @@ def detect_isolation_forest(features: list[SessionFeatures], contamination: floa
     amostras (que e a escala de um condominio), nao precisa de GPU, e a
     contribuicao de cada feature ao escore e inspecionavel -- o que permite
     dizer *o que* destoou, e nao apenas que algo destoou.
+
+    Tres decisoes que a primeira versao errava:
+
+    - **Limiar por escore, nao por cota.** `contamination=0.05` manda o modelo
+      rotular os 5% mais estranhos, EXISTAM ou nao anomalias: com 30 sessoes no
+      mes, sempre havia fatura retida, por construcao. `"auto"` usa o limiar do
+      artigo original (escore < -0,5): so sinaliza o que de fato se isola.
+    - **Hora do dia e circular.** 23h e 0h sao vizinhas; como numero, sao os
+      extremos. Entra como seno e cosseno.
+    - **Treina no historico, sinaliza a janela.** `only_ids` restringe a SAIDA;
+      o ajuste usa tudo o que foi passado.
     """
     from sklearn.ensemble import IsolationForest
     from sklearn.preprocessing import StandardScaler
 
+    # Sem telemetria, cinco das nove caracteristicas sao DESCONHECIDAS -- e
+    # desconhecido nao e zero. A primeira rodada com dado real mostrou o custo
+    # de confundir os dois: o historico do SEMS+ nao traz potencia, o codigo
+    # preenchia 0,0, e 17 das 18 recargas reais foram acusadas de "potencia
+    # zero". Vale aqui o que ja valia para a regra de ociosidade: sem base, o
+    # detector se abstem. Nao treina nessas sessoes nem as julga.
+    features = [f for f in features if f.has_telemetry]
     if len(features) < 30:
         return []
 
     df = to_frame(features)
-    X = df[ISOLATION_FEATURES].fillna(0.0).to_numpy(dtype=float)
+    ang = 2 * np.pi * df["start_hour"].astype(float) / 24.0
+    df["start_hour_sin"], df["start_hour_cos"] = np.sin(ang), np.cos(ang)
+    # Lacuna pontual (ex.: potencia maxima nao informada) entra como a MEDIANA
+    # da coluna: valor neutro, que nao puxa a amostra para longe das outras.
+    base = df[ISOLATION_FEATURES].astype(float)
+    X = base.fillna(base.median()).fillna(0.0).to_numpy(dtype=float)
     Xs = StandardScaler().fit_transform(X)
 
     model = IsolationForest(
-        n_estimators=200, contamination=contamination, random_state=20260831, n_jobs=1
+        n_estimators=200, contamination="auto", random_state=20260831, n_jobs=1
     )
     labels = model.fit_predict(Xs)
     scores = model.score_samples(Xs)
 
     out = []
-    mean, std = Xs.mean(axis=0), Xs.std(axis=0)
     for i, label in enumerate(labels):
-        if label != -1:
+        sid = int(df.iloc[i]["session_id"])
+        if label != -1 or (only_ids is not None and sid not in only_ids):
             continue
-        # Quais features mais destoaram desta amostra -- o "porque" da flag.
-        z = np.abs(Xs[i] - mean) / np.where(std > 0, std, 1)
-        top = np.argsort(-z)[:2]
-        motivos = ", ".join(
-            f"{ISOLATION_FEATURES[j]}={df.iloc[i][ISOLATION_FEATURES[j]]:.2f} "
-            f"({z[j]:.1f} desvios da média)" for j in top
-        )
+        # Quais caracteristicas mais destoaram -- o "porque" da flag. `Xs` ja
+        # esta padronizado: o valor absoluto E o numero de desvios da media.
+        z = np.abs(Xs[i])
+        vistos, motivos, categoria = set(), [], None
+        for j in np.argsort(-z):
+            rotulo, unidade, cat = FEATURE_LEGIVEL[ISOLATION_FEATURES[j]]
+            if rotulo in vistos:
+                continue
+            vistos.add(rotulo)
+            # "Degradacao" e "ociosidade" tem SENTIDO: potencia abaixo do
+            # habitual, tempo parado acima. Um desvio para o outro lado
+            # (potencia acima da media) destoa, mas nao e degradacao.
+            if cat == "power_degradation" and Xs[i][j] > 0:
+                cat = "consumption"
+            if cat == "idle" and Xs[i][j] < 0:
+                cat = "consumption"
+            categoria = categoria or cat
+            if rotulo == "horário de início":
+                valor = f"{int(df.iloc[i]['start_hour'])}h"
+            else:
+                valor = f"{df.iloc[i][ISOLATION_FEATURES[j]]:.1f} {unidade}".strip()
+            motivos.append(f"{rotulo} de {valor} ({z[j]:.1f} desvios do habitual)")
+            if len(motivos) == 2:
+                break
         out.append(
             Detection(
-                session_id=int(df.iloc[i]["session_id"]),
+                session_id=sid,
                 charge_point_id=None,
-                category="consumption",
+                category=categoria or "consumption",
                 explanation=(
-                    f"Combinação atípica de características nesta sessão: {motivos}. "
-                    "Detectada por Isolation Forest sobre o histórico do condomínio."
+                    "Recarga fora do padrão do condomínio: " + "; ".join(motivos) + ". "
+                    "Nenhuma regra isolada foi violada; é a combinação que destoa."
                 ),
                 detector="isolation_forest",
                 score=float(scores[i]),
@@ -253,21 +313,28 @@ def run_detection(condominium, since, until, *, use_isolation_forest: bool = Tru
     Idempotente: uma sessao ja sinalizada na mesma categoria nao gera flag
     duplicada, para que reprocessar o mes nao inunde a fila do sindico.
     """
-    sessions = list(
+    # Historico como CONTEXTO, janela como ALVO. Sessao em andamento fica de
+    # fora: ela ainda nao tem leitura final nem duracao, e julga-la agora era
+    # acusar de "leitura perdida" toda recarga que so nao terminou.
+    todas = list(
         ChargingSession.objects.filter(
             charge_point__condominium=condominium,
-            session_start__gte=since,
+            session_start__gte=since - timedelta(days=HISTORY_DAYS),
             session_start__lte=until,
-        ).select_related("credential__user__unit", "charge_point")
+        ).exclude(status=ChargingSession.Status.IN_PROGRESS)
+        .select_related("credential__user__unit", "charge_point")
         .prefetch_related("credential__user__vehicles")
     )
-    feats = extract(sessions)
+    sessions = [s for s in todas if s.session_start >= since]
+    alvo = {s.id for s in sessions}
+    feats_todas = extract(todas)
+    feats = [f for f in feats_todas if f.session_id in alvo]
     by_id = {s.id: s for s in sessions}
 
     # Mediana historica por credencial -- base da regra de consumo atipico.
     medians: dict[int, float] = {}
     grouped: dict[int, list[float]] = {}
-    for f in feats:
+    for f in feats_todas:
         if f.credential_id:
             grouped.setdefault(f.credential_id, []).append(f.energy_kwh)
     for cred_id, values in grouped.items():
@@ -292,7 +359,8 @@ def run_detection(condominium, since, until, *, use_isolation_forest: bool = Tru
     if use_isolation_forest:
         ja_marcadas = {d.session_id for d in detections}
         detections.extend(
-            d for d in detect_isolation_forest(feats) if d.session_id not in ja_marcadas
+            d for d in detect_isolation_forest(feats_todas, only_ids=alvo)
+            if d.session_id not in ja_marcadas
         )
 
     existentes = {
@@ -302,8 +370,19 @@ def run_detection(condominium, since, until, *, use_isolation_forest: bool = Tru
             | Q(charge_point__condominium=condominium)
         )
     }
-    novas = [
-        AnomalyFlag(
+    # A chave de idempotencia vale contra o banco E dentro do proprio lote: duas
+    # regras da mesma categoria (energia acima da bateria; 3x a mediana) acusam a
+    # mesma sessao, e o sindico via o mesmo caso duas vezes na fila. Fica a
+    # primeira, que e a mais especifica; a outra entra como complemento.
+    novas: dict[tuple, AnomalyFlag] = {}
+    for d in detections:
+        chave = (d.session_id, d.charge_point_id, d.category)
+        if chave in existentes:
+            continue
+        if chave in novas:
+            novas[chave].explanation += " Além disso: " + d.explanation
+            continue
+        novas[chave] = AnomalyFlag(
             session_id=d.session_id,
             charge_point_id=d.charge_point_id,
             category=d.category,
@@ -312,7 +391,4 @@ def run_detection(condominium, since, until, *, use_isolation_forest: bool = Tru
             score=d.score,
             status=AnomalyFlag.Status.OPEN,
         )
-        for d in detections
-        if (d.session_id, d.charge_point_id, d.category) not in existentes
-    ]
-    return AnomalyFlag.objects.bulk_create(novas)
+    return AnomalyFlag.objects.bulk_create(list(novas.values()))

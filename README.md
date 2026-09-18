@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="50 testes" src="https://img.shields.io/badge/testes-50%20passando-2ea44f?style=flat-square">
+  <img alt="81 testes" src="https://img.shields.io/badge/testes-81%20passando-2ea44f?style=flat-square">
   <img alt="14 entidades" src="https://img.shields.io/badge/esquema-14%20entidades-0f6b4f?style=flat-square">
-  <img alt="Recall da detecção: 100%" src="https://img.shields.io/badge/detecção%20de%20anomalias-recall%20100%25-0f6b4f?style=flat-square">
+  <img alt="Detecção de anomalias medida por curva de sensibilidade" src="https://img.shields.io/badge/detecção%20de%20anomalias-medida%20por%20curva%20de%20sensibilidade-0f6b4f?style=flat-square">
   <img alt="Sprint 2 entregue" src="https://img.shields.io/badge/Sprint%202-entregue-2ea44f?style=flat-square">
   <img alt="FIAP x GoodWe" src="https://img.shields.io/badge/FIAP-%C3%97%20GoodWe-ED145B?style=flat-square">
 </p>
@@ -19,7 +19,7 @@
 Enterprise Challenge 2026, Sprints 1 e 2: a pesquisa, o desenho e a implementação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável. A Sprint 1 produziu os três dossiês de pesquisa e o contrato de arquitetura; a Sprint 2 implementou a plataforma, que roda em [`app/`](app/).
 
 > [!IMPORTANT]
-> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **50 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
+> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **81 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
 
 ### Dois READMEs, dois propósitos
 
@@ -222,7 +222,7 @@ possível linha a linha.
 O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
-escrito meses antes do código, e não lidos da implementação. São 50 testes no total.
+escrito meses antes do código, e não lidos da implementação. São 81 testes no total.
 
 ### O que a implementação ensinou e a pesquisa não tinha visto
 
@@ -252,6 +252,18 @@ ultrapassava o limiar. Corrigidos os três, o recall é de 100% nas cinco catego
 argumento prático para a exigência de IA não decorativa: decorativa é o que não tem métrica,
 porque nada nela pode ser reprovado.
 
+**E o próprio 100% precisava ser reprovado.** Revendo a avaliação, vimos que ela era circular:
+o gerador injetava ociosidade de 5 a 11 horas e a regra dispara acima de 4, então o acerto
+estava garantido por construção. O número valia como teste de integração do detector e foi
+rebaixado a isso. A medida que informa é a **curva de sensibilidade**: anomalias de
+intensidade espalhada, inclusive abaixo do limiar, com a taxa de detecção separada por fase.
+Ela mostrou a fase 1 como um degrau limpo no limiar declarado (nenhum alarme abaixo de 3 horas
+ociosas, todos acima de 4), que é o comportamento correto de uma política, e mostrou o
+Isolation Forest cobrindo a zona cinzenta que a regra deixa de fora: cerca de metade das
+degradações de potência entre 60% e 75%, que nenhuma regra acusa. É a primeira evidência medida
+de que a fase 2 tem função própria. `manage.py evaluate_ai` reproduz as duas tabelas sem tocar
+no banco de demonstração.
+
 ### A IA no lugar que a Sprint 1 prometeu
 
 A detecção roda **antes do fechamento da fatura**: a linha suspeita entra marcada e a fatura
@@ -268,13 +280,24 @@ de quem responde por ela.
 
 ### Limites declarados
 
-Nenhum evento real de um HCA G2 atravessou este pipeline. O adaptador SEMS é um stub sobre o
-contrato espelhado da documentação pública: o mapeamento de campos está escrito e testado, e
-o que muda no dia em que houver credencial são as poucas linhas que buscam o payload. O
-gateway foi construído para tornar essa troca barata, e há um teste que mostra um JSON de API
-de fabricante e um TSV acadêmico de 2014 entrando pelo mesmo caminho e saindo
-indistinguíveis para o motor de rateio. Mas mostrar que o cano é agnóstico não é o mesmo que
-já ter passado dado real por ele.
+O primeiro dado real atravessou o pipeline: as 18 sessões do HCA G2 do laboratório da FIAP,
+observadas no SEMS+ (136,66 kWh), entram pelo mesmo gateway que as demais fontes. O limite
+que resta é de outra natureza. Esse dado é observação da tela da plataforma, de nível [O], e
+não resposta de uma chamada autenticada à API, que segue negada. Os números são reais; o
+formato de transporte definitivo ainda é desconhecido. Por isso cada adaptador separa de onde
+o dado vem do que cada campo significa: no dia da credencial, troca-se o primeiro.
+
+O dado real cobrou três correções que dado sintético não cobraria: o medidor inicial, que
+julgávamos universal, não é reportado pela fonte; a fase 2 da detecção tratava potência não
+informada como potência zero; e todas as sessões chegaram sem dono, porque o carregador
+operava em partida automática. O último ponto é o achado mais importante da sprint e está
+discutido, com a proposta de integração, em
+[`docs/sprint2-ingestao-e-integracao.md`](docs/sprint2-ingestao-e-integracao.md).
+
+Seguem sem verificação contra hardware o caminho de gateway de borda por Modbus (o mapa de
+registradores do HCA G2 não é público) e a exposição do webhook de eventos fora do ambiente
+de desenvolvimento. O histórico de seis meses continua sintético, calibrado em dado real de
+recarga em ambiente de trabalho, com o perfil residencial declarado como premissa.
 
 ## Uso de inteligência artificial
 

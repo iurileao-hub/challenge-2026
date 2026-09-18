@@ -164,10 +164,10 @@ cd app
 uv sync
 uv run python manage.py migrate
 
-# 3. dados de demonstração: mês fictício do dossiê + 6 meses sintéticos (~4 s)
+# 3. dados de demonstração: mês fictício do dossiê + 6 meses sintéticos, jan a jun (~7 s)
 uv run python manage.py seed_demo --months 6 --reset
 
-# 4. pipeline completo: detecção -> rateio -> previsão -> reconciliação (~5 s)
+# 4. pipeline completo: ingestão do dado real -> detecção -> rateio -> previsão -> reconciliação (~8 s)
 uv run python manage.py pipeline --reconciliar
 
 # 5. interface
@@ -325,6 +325,22 @@ distribuidora chega, `billing/reconciliation.py` compara a tarifa efetiva com a
 provisória e lança a diferença como linha de ajuste na competência seguinte, sem tocar
 no mês já fechado.
 
+### Como o dado entra
+
+Toda recarga entra pelo gateway de ingestão (`ingestion/gateway.py`), venha de onde vier:
+arquivo, consulta periódica a uma API, webhook de eventos ou gateway de borda. O gateway
+valida, deduplica, resolve a credencial, congela a tarifa e registra cada registro recebido
+num diário com o conteúdo original e o desfecho. O que ele recusa fica em quarentena, com
+motivo legível, e volta a ser processado por `manage.py ingest --replay`.
+
+O desenho, as garantias (cada uma com o teste que a prova) e a proposta de integração com a
+GoodWe estão em [`docs/sprint2-ingestao-e-integracao.md`](../docs/sprint2-ingestao-e-integracao.md).
+
+O `pipeline` começa ingerindo o primeiro dado real do projeto: as 18 sessões do HCA G2 do
+laboratório da FIAP, observadas no SEMS+. Todas chegam sem dono, porque o carregador operava
+em partida automática. Elas aparecem em **Entrada de dados**, com o valor em reais que ficou
+fora do rateio, e o gestor atribui dono a cada uma.
+
 ## 7. Mapa de rotas
 
 | Rota | Quem acessa | O que faz |
@@ -333,7 +349,11 @@ no mês já fechado.
 | `/` | autenticado | Encaminha cada pessoa para a interface que é dela (gestor para o painel, morador para o extrato) |
 | `/painel/` | gestor | Ocupação, saúde dos pontos, curva prevista com o método declarado, fila de auditoria |
 | `/painel/anomalia/<id>/revisar/` | gestor (POST) | Confirma ou descarta uma anomalia. Muda o estado da fatura, nunca o valor |
+| `/painel/anomalia/<id>/resolver/` | gestor (POST) | Registra o desfecho de um caso confirmado e libera a cobrança. Exige texto |
 | `/painel/relatorio/` | gestor | Relatório mensal da assembleia, com exportação CSV |
+| `/painel/entrada/` | gestor | Entrada de dados: recargas sem dono (com valor em reais), fontes, quarentena, últimas entregas |
+| `/painel/entrada/recarga/<id>/atribuir/` | gestor (POST) | Dá dono a uma recarga órfã, preservando o identificador que o equipamento reportou |
+| `/api/v1/ingest/<fonte>/` | fonte de dados (POST assinado) | Webhook de eventos, autenticado por HMAC-SHA256. Desligado enquanto `INGEST_PUSH_SECRETS` estiver vazio |
 | `/extrato/` | morador | Fatura explicada linha a linha, sessões que a formaram, melhor janela de recarga |
 | `/extrato/linha/<id>/contestar/` | morador (POST) | Contestação informada: a evidência antes da discordância |
 | `/admin/` | superusuário | Admin do Django, útil para inspecionar as 14 entidades cruas |
@@ -392,8 +412,9 @@ Todos com `uv run python manage.py <comando>`.
 | Comando | O que faz | Opções |
 |---|---|---|
 | `seed_demo` | Popula o banco com o condomínio de demonstração: o mês fictício de junho/2026 do dossiê, mais meses sintéticos calibrados no dado real | `--months N` (meses de histórico sintético), `--reset` (apaga o cenário anterior), `--seed N` (semente determinística), `--anomaly-rate F` (fração de sessões com anomalia injetada) |
-| `pipeline` | Executa o ciclo completo de uma competência: detecção, fechamento do rateio, previsão | `--competencia AAAA-MM` (default `2026-06`), `--reconciliar` (encena a chegada da conta real e lança os ajustes) |
-| `evaluate_ai` | Gera dados com gabarito conhecido, roda a detecção e reporta precisão e recall por categoria de anomalia. **Substitui o cenário de demonstração**, ver o aviso na seção 10 | `--months N`, `--seed N`, `--anomaly-rate F`, `--no-isolation-forest` (mede só a fase 1) |
+| `pipeline` | Executa o ciclo completo de uma competência: ingestão do histórico real do HCA G2, detecção, fechamento do rateio, previsão. Competência já fechada é mantida, não reescrita | `--competencia AAAA-MM` (default `2026-06`), `--reconciliar` (encena a chegada da conta real e lança os ajustes), `--force` (reprocessa mês fechado de propósito) |
+| `ingest` | Porta de entrada de dados: ingere uma fonte pelo gateway, reprocessa a quarentena ou mostra o diário | `<fonte>` (`semsplus_log`, `sems_stub`, `asensio_dataset`), `--path`, `--resume` (só o que é novo desde a última execução), `--replay`, `--status` |
+| `evaluate_ai` | Gera dados com gabarito conhecido, roda a detecção e reporta duas coisas: recall sobre anomalias nítidas e a curva de sensibilidade, por detector, no entorno dos limiares. Mede dentro de uma transação desfeita: **não toca no banco de demonstração** | `--months N`, `--seed N`, `--seeds N` (sementes consecutivas), `--anomaly-rate F`, `--no-isolation-forest` (mede só a fase 1) |
 | `forecast_demo` | Previsão de demanda de 7 dias, isolada do resto do pipeline | `--today AAAA-MM-DD` (default `2026-05-31`) |
 
 O `evaluate_ai` é o comando que sustenta a afirmação de que a IA não é decorativa:
@@ -402,7 +423,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 50 testes
+uv run pytest                    # 81 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -411,9 +432,10 @@ Distribuição da suíte:
 | Arquivo | Testes | O que garante |
 |---|---|---|
 | `billing/tests/test_mes_ficticio.py` | 19 | A suíte de aceitação: reproduz o mês fictício do dossiê, e fixa a convenção de arredondamento |
-| `portal/tests/test_portal.py` | 16 | Interfaces, autorização por papel, contestação e revisão |
-| `intelligence/tests/test_deteccao.py` | 10 | Detecção nas duas fases, e o ciclo de estados da fatura |
+| `portal/tests/test_portal.py` | 25 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), recarga sem dono até a fatura |
+| `intelligence/tests/test_deteccao.py` | 13 | Detecção nas duas fases, o ciclo de estados da fatura, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria e o alerta de fila |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
+| `ingestion/tests/test_robustez.py` | 19 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado, as 18 sessões reais do HCA G2, e os invariantes de banco |
 
 A suíte de aceitação reproduz o mês fictício de junho/2026 do dossiê: as três faturas
 (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes de
@@ -426,19 +448,16 @@ Para medir a detecção de anomalias contra o gabarito do gerador:
 uv run python manage.py evaluate_ai --months 6
 ```
 
-> ⚠️ **`evaluate_ai` substitui o cenário de demonstração.** Ele precisa de dados com
-> gabarito conhecido, então gera um cenário novo por cima do que estava no banco. Duas
-> consequências: as faturas de junho somem, e os logins do portal (`sindica`, `ana`,
-> `carla`, `davi`) ficam órfãos, porque o vínculo entre a conta de acesso e a pessoa é
-> feito pelo `seed_demo`. O sintoma é o portal responder 404 em todas as telas depois de
-> um login bem-sucedido. Para restaurar, repita os passos 3 e 4 do "Como rodar":
->
-> ```bash
-> uv run python manage.py seed_demo --months 6 --reset
-> uv run python manage.py pipeline --reconciliar
-> ```
->
-> Rode o `evaluate_ai` antes de demonstrar o sistema, nunca durante.
+O comando imprime dois blocos. O primeiro mede o recall sobre anomalias nítidas, bem além
+do limiar das regras: é teste de integração do detector, e 100% ali é o esperado, não um
+resultado. O segundo é a **curva de sensibilidade**: anomalias de intensidade espalhada,
+inclusive abaixo do limiar, com a taxa de detecção separada por detector. É ela que mostra
+onde cada fase opera: a fase 1 é um degrau limpo no limiar declarado, e o Isolation Forest
+cobre a zona cinzenta logo aquém dele (cerca de metade das degradações de potência entre
+60% e 75%, que nenhuma regra acusa).
+
+A medição roda dentro de uma transação que é desfeita no fim. O banco de demonstração
+sai intacto, e o comando pode ser rodado a qualquer momento.
 
 ## 11. Decisões que valem explicação
 
@@ -481,7 +500,7 @@ trabalho e nunca observou um condomínio.
 |---|---|---|
 | `connection to server at "127.0.0.1", port 5432 failed` | PostgreSQL não está rodando | Linux: `sudo systemctl start postgresql`. macOS: `brew services start postgresql@16`. Windows: iniciar o serviço `postgresql-x64-16` em `services.msc` |
 | `FATAL: role "chargeops" does not exist` | O passo 1 não foi executado | Rodar os dois comandos `psql` do passo 1, na variante do seu sistema |
-| Portal responde **404 em todas as telas** logo após um login bem-sucedido | `evaluate_ai` substituiu o cenário e deixou os logins órfãos | `seed_demo --months 6 --reset` e `pipeline --reconciliar`. Ver o aviso na seção 10 |
+| Portal responde **404 em todas as telas** logo após um login bem-sucedido | O login existe, mas não está vinculado a uma pessoa do condomínio (o vínculo é feito pelo `seed_demo`) | `seed_demo --months 6 --reset` e `pipeline --reconciliar` |
 | `psql: command not found` (macOS) | O Homebrew não põe o PostgreSQL 16 no PATH | `export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"` (Intel: `/usr/local/opt/...`) |
 | `role "postgres" does not exist` (macOS) | O Homebrew usa o seu usuário como administrador | Usar `psql -d postgres -c ...`, sem `sudo -u postgres` |
 | `psql` não reconhecido (Windows) | O instalador não adicionou ao PATH | Adicionar `C:\Program Files\PostgreSQL\16\bin` ao PATH, ou usar o "SQL Shell (psql)" do menu Iniciar |

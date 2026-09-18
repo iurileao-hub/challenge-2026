@@ -36,11 +36,12 @@ dizendo que esta tudo certo enquanto o dinheiro de alguem esta segurado.{% endco
       {{ em_auditoria }} fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }}
     </div>
     <div class="detalhe">
-      Você já revisou e confirmou o problema{{ em_auditoria|pluralize:"s" }}
-      {% if unidades_retidas %}da{{ unidades_retidas|pluralize:"s" }} unidade{{ unidades_retidas|pluralize:"s" }}
-      {% for u in unidades_retidas %}{{ u }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.
-      A cobrança segue segurada até o caso se resolver. As outras faturas de
-      {{ competencia }} estão prontas para fechar.
+      {% if confirmadas %}Você confirmou {{ confirmadas|length }} problema{{ confirmadas|length|pluralize:"s" }}
+      e a cobrança segue segurada até você registrar o desfecho, logo abaixo.
+      {% else %}Há cobrança em conferência{% endif %}
+      {% if unidades_retidas %}(unidade{{ unidades_retidas|pluralize:"s" }}
+      {% for u in unidades_retidas %}{{ u }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}.
+      As outras faturas de {{ competencia }} estão prontas para fechar.
     </div>
   </div>
 </div>
@@ -93,7 +94,8 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
           {% endif %}
         </td>
         <td data-rotulo="Tipo">
-          <span class="selo {% if a.category == 'health' %}perigo{% else %}aviso{% endif %}">{{ a.get_category_display }}</span>
+          {% if a.status == 'contested' %}<span class="selo perigo">Contestação do morador</span>
+          {% else %}<span class="selo {% if a.category == 'health' %}perigo{% else %}aviso{% endif %}">{{ a.get_category_display }}</span>{% endif %}
         </td>
         <td data-rotulo="O que aconteceu" class="solo">
           {{ a.explanation }}
@@ -105,15 +107,15 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
           <div class="decisao">
             <div class="opcao">
               <form method="post" action="{% url 'revisar_anomalia' a.id %}"
-                    onsubmit="return confirm('Confirmar que a cobrança {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label }} {% endif %}fica retida até o caso se resolver?')">
+                    onsubmit="return confirm('Confirmar que a cobrança {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}fica retida até o caso se resolver?')">
                 {% csrf_token %}
                 <button type="submit" name="decisao" value="accepted" class="reter">É um problema real</button>
               </form>
-              <div class="consequencia">A linha continua marcada e a fatura segue retida até o caso se resolver.</div>
+              <div class="consequencia">A cobrança segue retida até você registrar o desfecho do caso.</div>
             </div>
             <div class="opcao">
               <form method="post" action="{% url 'revisar_anomalia' a.id %}"
-                    onsubmit="return confirm('Liberar a fatura {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label }} {% endif %}para fechamento? Esta decisão fica registrada no seu nome.')">
+                    onsubmit="return confirm('Liberar a fatura {% if a.session.credential %}da unidade {{ a.session.credential.user.unit.label|escapejs }} {% endif %}para fechamento? Esta decisão fica registrada no seu nome.')">
                 {% csrf_token %}
                 <button type="submit" name="decisao" value="dismissed" class="liberar">Está tudo certo</button>
               </form>
@@ -135,16 +137,59 @@ KPIs. Deixa-la no rodape escondia a tese atras de sete telas de rolagem.{% endco
   <p class="vazio" style="padding-left:0">
     {% if em_auditoria %}
       Nada aguarda decisão sua. A{{ em_auditoria|pluralize:"s" }} {{ em_auditoria }}
-      fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }} continua{{ em_auditoria|pluralize:"m" }}
-      segurada{{ em_auditoria|pluralize:"s" }} porque você confirmou o problema, e só sai
-      dessa situação quando o caso se resolver.
+      fatura{{ em_auditoria|pluralize:"s" }} retida{{ em_auditoria|pluralize:"s" }}
+      depende{{ em_auditoria|pluralize:"m" }} do desfecho dos casos confirmados abaixo.
     {% else %}
       Nenhuma anomalia aberta. Todas as {{ sessoes_mes }} recargas de {{ competencia }} passaram
       na verificação automática e nenhuma fatura ficou retida.
     {% endif %}
   </p>
   {% endif %}
+
+  {% if confirmadas %}
+  <h3 style="margin-top:26px">Casos confirmados, à espera de desfecho</h3>
+  <p class="legenda" style="margin-top:4px">
+    Você disse que o problema é real. A cobrança fica retida até você registrar o que foi
+    feito: cobrar assim mesmo, corrigir o valor, isentar. O texto entra na trilha de auditoria.
+  </p>
+  {% for a in confirmadas %}
+  <form method="post" action="{% url 'resolver_anomalia' a.id %}" class="desfecho">
+    {% csrf_token %}
+    <div class="caso">
+      <span class="selo aviso">{{ a.get_category_display }}</span>
+      {% if a.session.credential %}<strong>unidade {{ a.session.credential.user.unit.label }}</strong> ·{% endif %}
+      {{ a.explanation }}
+      <span style="color:var(--ink-soft)">· confirmado por {{ a.reviewed_by_user.name|default:"gestor" }}
+      em {{ a.reviewed_at|date:"d/m" }}</span>
+    </div>
+    <label class="sr-only" for="desfecho-{{ a.id }}">Desfecho do caso</label>
+    <input id="desfecho-{{ a.id }}" name="desfecho" maxlength="500" required
+           placeholder="O que foi feito? Ex.: conferido com o morador, cobrança mantida.">
+    <button type="submit" class="liberar">Registrar desfecho e liberar</button>
+  </form>
+  {% endfor %}
+  {% endif %}
 </div>
+
+{% if sem_dono.n or quarentena %}
+<div class="faixa-estado pendente" style="margin-top:0">
+  <div class="icone" aria-hidden="true">⚡</div>
+  <div class="texto">
+    <div class="titulo">
+      {% if sem_dono.n %}{{ sem_dono.n }} recarga{{ sem_dono.n|pluralize:"s" }} sem dono
+      · {{ sem_dono.kwh|floatformat:2 }} kWh · R$ {{ sem_dono.valor|floatformat:2 }}
+      {% else %}{{ quarentena }} registro{{ quarentena|pluralize:"s" }} em quarentena{% endif %}
+    </div>
+    <div class="detalhe">
+      {% if sem_dono.n %}Energia que o condomínio pagou na conta de luz e ninguém ressarciu,
+      porque o carregador não soube dizer quem carregou.{% endif %}
+      {% if quarentena and sem_dono.n %}Além disso, {{ quarentena }} registro{{ quarentena|pluralize:"s" }}
+      da fonte ficaram em quarentena.{% endif %}
+    </div>
+  </div>
+  <a class="botao" href="{% url 'entrada' %}">Ver entrada de dados</a>
+</div>
+{% endif %}
 
 {# --- Números do mês: contexto, não chamada para ação. Peso visual menor. --- #}
 <div class="grade n3">

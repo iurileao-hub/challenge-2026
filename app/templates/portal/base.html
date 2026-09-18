@@ -15,6 +15,7 @@
     {% if e_gestor %}
       <a href="{% url 'painel' %}" class="{% if pagina == 'painel' %}ativo{% endif %}">Painel</a>
       <a href="{% url 'relatorio' %}" class="{% if pagina == 'relatorio' %}ativo{% endif %}">Prestação de contas</a>
+      <a href="{% url 'entrada' %}" class="{% if pagina == 'entrada' %}ativo{% endif %}">Entrada de dados</a>
     {% else %}
       <a href="{% url 'extrato' %}" class="{% if pagina == 'extrato' %}ativo{% endif %}">Minha conta</a>
     {% endif %}

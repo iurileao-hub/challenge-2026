@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 
 from billing.competence import Competence
 from billing.engine import close_competence
-from core.models import AnomalyFlag, AppUser, Invoice, InvoiceLine
+from core.models import AnomalyFlag, AppUser, ChargingSession, Invoice, InvoiceLine
 from core.scenarios import build_jardim_aurora
 
 JUNHO = Competence(2026, 6)
@@ -141,19 +141,82 @@ def test_confirmar_anomalia_mantem_a_fatura_retida(client, cenario):
 
 def test_leitura_perdida_nao_e_liberada_por_decisao_sobre_outra_flag(cenario, client):
     """A marcacao por telemetria perdida vem do motor, nao da IA: descartar uma
-    flag nao apaga o motivo estrutural da auditoria."""
+    flag de OUTRO assunto nao apaga o motivo estrutural da auditoria."""
     sessao = cenario["sessions"][1005]      # meter_stop nulo
+    outra = AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.CONSUMPTION,
+        explanation="consumo atipico", status=AnomalyFlag.Status.OPEN,
+    )
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    entrar(client, "sindica")
+    client.post(f"/painel/anomalia/{outra.id}/revisar/", {"decisao": "dismissed"})
+
+    linha = InvoiceLine.objects.get(session=sessao)
+    assert linha.flagged_for_audit is True
+    assert linha.invoice.status == Invoice.Status.UNDER_REVIEW
+
+
+def test_aceitar_a_leitura_conservadora_libera_a_fatura(cenario, client):
+    """A conferencia humana da leitura perdida precisa TERMINAR.
+
+    Antes, a tela oferecia "Esta tudo certo -- a fatura fica liberada", o
+    gestor clicava, e a fatura seguia retida para sempre: a unica pendencia da
+    demonstracao nao tinha saida. Encerrar a flag de MEDICAO e o gestor dizendo
+    que aceita a ultima leitura periodica, o valor mais conservador.
+    """
+    sessao = cenario["sessions"][1005]
     flag = AnomalyFlag.objects.create(
         session=sessao, category=AnomalyFlag.Category.METERING,
         explanation="leitura perdida", status=AnomalyFlag.Status.OPEN,
     )
     close_competence(cenario["condominium"], JUNHO, force=True)
+    linha = InvoiceLine.objects.get(session=sessao)
+    assert linha.flagged_for_audit is True
+
     entrar(client, "sindica")
     client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "dismissed"})
 
-    linha = InvoiceLine.objects.get(session=sessao)
-    assert linha.flagged_for_audit is True
-    assert linha.invoice.status == Invoice.Status.UNDER_REVIEW
+    linha.refresh_from_db()
+    assert linha.flagged_for_audit is False
+    assert linha.invoice.status == Invoice.Status.CLOSED
+    # E a liberacao sobrevive ao reprocessamento do mes.
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    assert InvoiceLine.objects.get(session=sessao).flagged_for_audit is False
+
+
+def test_caso_confirmado_tem_saida_e_ela_exige_registro(client, cenario):
+    flag = AnomalyFlag.objects.create(
+        session=cenario["sessions"][1003], category=AnomalyFlag.Category.CONSUMPTION,
+        explanation="consumo atipico", status=AnomalyFlag.Status.OPEN,
+    )
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    entrar(client, "sindica")
+    client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "accepted"})
+    inv = Invoice.objects.get(unit=cenario["units"]["105"], competence=str(JUNHO))
+    assert inv.status == Invoice.Status.UNDER_REVIEW
+    assert "à espera de desfecho" in client.get("/painel/").content.decode()
+
+    client.post(f"/painel/anomalia/{flag.id}/resolver/", {"desfecho": "  "})
+    inv.refresh_from_db()
+    assert inv.status == Invoice.Status.UNDER_REVIEW        # sem texto, nao libera
+
+    client.post(f"/painel/anomalia/{flag.id}/resolver/", {"desfecho": "conferido com o morador"})
+    inv.refresh_from_db()
+    flag.refresh_from_db()
+    assert inv.status == Invoice.Status.CLOSED
+    assert (flag.status, flag.resolution) == ("resolved", "conferido com o morador")
+
+
+def test_decisao_tomada_nao_e_sobrescrita(client, cenario):
+    flag = AnomalyFlag.objects.create(
+        session=cenario["sessions"][1003], category=AnomalyFlag.Category.CONSUMPTION,
+        explanation="x", status=AnomalyFlag.Status.OPEN,
+    )
+    entrar(client, "sindica")
+    client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "accepted"})
+    client.post(f"/painel/anomalia/{flag.id}/revisar/", {"decisao": "dismissed"})
+    flag.refresh_from_db()
+    assert flag.status == "accepted"
 
 
 def test_contestacao_do_morador_retem_a_fatura(client, cenario):
@@ -240,3 +303,97 @@ def test_extrato_de_unidade_individual_nao_repete_o_nome(client, cenario):
     entrar(client, "carla")
     corpo = client.get("/extrato/").content.decode()
     assert "Iniciada por" not in corpo
+
+
+def test_contestacao_chega_a_fila_do_sindico_e_sobrevive_ao_refechamento(client, cenario):
+    """Tres defeitos do mesmo desencontro: a fila so listava `open`, o motor so
+    retinha `open`, e o pipeline refecha com force. A contestacao do morador
+    nao tinha destinatario e sumia na rodada seguinte."""
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    linha = InvoiceLine.objects.get(session=cenario["sessions"][1007])
+    entrar(client, "carla")
+    client.post(f"/extrato/linha/{linha.id}/contestar/", {"motivo": "nao carreguei nesse dia"})
+    client.post(f"/extrato/linha/{linha.id}/contestar/", {"motivo": "de novo"})
+    assert AnomalyFlag.objects.filter(detector="morador").count() == 1     # sem duplicar
+    client.post("/sair/")
+
+    entrar(client, "sindica")
+    html = client.get("/painel/").content.decode()
+    assert "Contestação do morador" in html and "nao carreguei nesse dia" in html
+
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    assert InvoiceLine.objects.get(session=cenario["sessions"][1007]).flagged_for_audit is True
+
+
+def test_contestar_linha_que_nao_e_recarga_nao_quebra(client, cenario):
+    close_competence(cenario["condominium"], JUNHO, force=True)
+    taxa = InvoiceLine.objects.filter(
+        invoice__unit=cenario["units"]["34"], kind=InvoiceLine.Kind.AVAILABILITY_FEE
+    ).first()
+    entrar(client, "carla")
+    resp = client.post(f"/extrato/linha/{taxa.id}/contestar/", {"motivo": "x"})
+    assert resp.status_code == 302
+    assert not AnomalyFlag.objects.exists()
+
+
+def test_competencia_invalida_na_url_e_404_e_nao_500(client, cenario):
+    entrar(client, "sindica")
+    assert client.get("/painel/relatorio/?competencia=abc").status_code == 404
+    client.post("/sair/")
+    entrar(client, "carla")
+    assert client.get("/extrato/?competencia=2026-13").status_code == 404
+
+
+def test_recarga_sem_dono_ganha_dono_e_entra_na_proxima_fatura(client, cenario):
+    """O caminho inteiro do dado real: entra orfa, o gestor atribui, e o motor
+    a cobra na proxima competencia sem reescrever o mes fechado."""
+    from billing.competence import Competence
+    from ingestion.adapters import SemsPlusLogAdapter
+    from ingestion.gateway import IngestionGateway
+
+    condo = cenario["condominium"]
+    junho = close_competence(condo, JUNHO, force=True)
+    total_carla = Invoice.objects.get(unit=cenario["units"]["34"], competence=str(JUNHO)).total_amount
+    IngestionGateway(condo).ingest(SemsPlusLogAdapter())
+
+    entrar(client, "sindica")
+    html = client.get("/painel/entrada/").content.decode()
+    assert "18 recargas sem dono" in html and "136,66 kWh" in html
+    assert "Partida sem cartão" in html
+
+    orfa = ChargingSession.objects.filter(source="semsplus_log", energy_kwh="10.70").get()
+    carla = cenario["users"]["carla"]
+    # Auto-start: cadastrar o "cartao" daria a Carla toda recarga anonima do predio.
+    client.post(f"/painel/entrada/recarga/{orfa.id}/atribuir/", {"morador": carla.id, "alcance": "cartao"})
+    orfa.refresh_from_db()
+    assert orfa.credential is None
+    client.post(f"/painel/entrada/recarga/{orfa.id}/atribuir/", {"morador": carla.id, "alcance": "sessao"})
+    orfa.refresh_from_db()
+    assert orfa.credential.user == carla
+    assert orfa.auth_id == "57000HPA247L0002"          # o que o equipamento disse fica na trilha
+
+    julho = close_competence(condo, Competence.parse("2026-07"))
+    tardia = InvoiceLine.objects.get(session=orfa)
+    assert tardia.invoice.competence == "2026-07" and "2026-06" in tardia.description
+    assert tardia.amount == Decimal("7.76")            # 10,70 kWh x R$ 0,7252
+    # Junho, fechado, nao foi tocado -- nem se for reprocessado depois.
+    assert Invoice.objects.get(unit=cenario["units"]["34"], competence=str(JUNHO)).total_amount == total_carla
+    assert close_competence(condo, JUNHO, force=True).total_billed == junho.total_billed
+
+
+def test_morador_nao_acessa_a_entrada_de_dados(client, cenario):
+    entrar(client, "carla")
+    assert client.get("/painel/entrada/").status_code == 404
+    assert client.post("/painel/entrada/recarga/1/atribuir/", {"morador": 1}).status_code == 404
+
+
+def test_painel_e_extrato_concordam_sobre_a_hora_da_recarga(client, cenario):
+    """O painel renderizava em UTC: 22h45 de 12/06 virava 01h45 de 13/06."""
+    sessao = cenario["sessions"][1005]      # 12/06 as 22:45 BRT
+    AnomalyFlag.objects.create(
+        session=sessao, category=AnomalyFlag.Category.METERING,
+        explanation="leitura perdida", status=AnomalyFlag.Status.OPEN,
+    )
+    entrar(client, "sindica")
+    html = client.get("/painel/").content.decode()
+    assert "12/06 às 22:45" in html and "13/06 às 01:45" not in html

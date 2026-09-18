@@ -23,6 +23,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from billing.audit import sync_session
 from billing.competence import Competence, condo_tz
 from billing.engine import billable_sessions, close_competence, enrolled_units
 from core.models import (
@@ -36,6 +37,8 @@ from core.models import (
     TelemetryReading,
     Unit,
 )
+from ingestion import orphans
+from ingestion.models import IngestionRun, RawEvent
 from intelligence.forecast import forecast
 
 #: Abaixo disso, a contagem por hora nao sustenta uma recomendacao de horario.
@@ -107,6 +110,27 @@ def _is_manager(request) -> bool:
     return bool(au and au.role == AppUser.Role.MANAGER)
 
 
+def _condo() -> Condominium:
+    condo = Condominium.objects.order_by("id").first()
+    if condo is None:
+        raise Http404("nenhum condominio cadastrado")
+    return condo
+
+
+def _competence_from(request) -> Competence:
+    """`?competencia=abc` e pagina nao encontrada, nao erro 500."""
+    try:
+        return Competence.parse(request.GET.get("competencia") or str(_current_competence()))
+    except (ValueError, TypeError):
+        raise Http404("competencia invalida") from None
+
+
+def _flags_do_condo(condo):
+    return AnomalyFlag.objects.filter(
+        Q(session__charge_point__condominium=condo) | Q(charge_point__condominium=condo)
+    ).select_related("session__credential__user__unit", "charge_point")
+
+
 def _current_competence() -> Competence:
     return Competence.of(datetime.combine(DEMO_TODAY, time(12), tzinfo=condo_tz()))
 
@@ -125,7 +149,7 @@ def home(request):
 def painel(request):
     if not _is_manager(request):
         raise Http404
-    condo = Condominium.objects.first()
+    condo = _condo()
     comp = _current_competence()
 
     sessions = list(billable_sessions(condo, comp))
@@ -135,12 +159,14 @@ def painel(request):
     faturas = Invoice.objects.filter(condominium=condo, competence=str(comp))
     receita = faturas.aggregate(t=Sum("total_amount"))["t"] or Decimal("0.00")
 
-    anomalias = (
-        AnomalyFlag.objects.filter(status=AnomalyFlag.Status.OPEN)
-        .filter(Q(session__charge_point__condominium=condo) | Q(charge_point__condominium=condo))
-        .select_related("session__credential__user__unit", "charge_point")
-        .order_by("-created_at")
-    )
+    # A fila e tudo o que ESPERA decisao: o que a deteccao abriu e o que o
+    # morador contestou. Listar so `open` deixava a contestacao sem destinatario.
+    anomalias = _flags_do_condo(condo).filter(status__in=AnomalyFlag.AWAITING).order_by("-created_at")
+    confirmadas = _flags_do_condo(condo).filter(status=AnomalyFlag.Status.ACCEPTED).order_by("-reviewed_at")
+    sem_dono = orphans.orphan_summary(condo)
+    quarentena = RawEvent.objects.filter(
+        outcome__in=RawEvent.QUARANTINE, resolved_at__isnull=True
+    ).count()
 
     previsao = forecast(condo, today=DEMO_TODAY)
 
@@ -186,6 +212,9 @@ def painel(request):
         "faturas": faturas.count(),
         "em_auditoria": faturas.filter(status=Invoice.Status.UNDER_REVIEW).count(),
         "anomalias": anomalias,
+        "confirmadas": confirmadas,
+        "sem_dono": sem_dono,
+        "quarentena": quarentena,
         "previsao": previsao,
         "pontos": pontos,
         "ocupacao": [{"hora": h, "n": n, "pct": int(n / pico * 100)} for h, n in enumerate(ocupacao)],
@@ -195,44 +224,59 @@ def painel(request):
 @login_required
 @require_POST
 def revisar_anomalia(request, flag_id: int):
-    """O humano decide. A IA nunca fecha o proprio caso."""
+    """O humano decide. A IA nunca fecha o proprio caso.
+
+    As duas decisoes NAO sao simetricas. Descartar significa "nao havia
+    problema": a linha sai da auditoria. Confirmar significa o oposto -- o
+    problema e real, e a linha PERMANECE retida ate o caso ter desfecho
+    (`resolver_anomalia`). A regra de retencao mora em `billing.audit`.
+    """
     if not _is_manager(request):
         raise Http404
-    flag = get_object_or_404(AnomalyFlag, pk=flag_id)
+    flag = get_object_or_404(_flags_do_condo(_condo()), pk=flag_id)
     decisao = request.POST.get("decisao")
     if decisao not in {"accepted", "dismissed"}:
         messages.error(request, "Decisão inválida.")
+        return redirect("painel")
+    if flag.status not in AnomalyFlag.AWAITING:
+        # Decisao tomada nao se sobrescreve: `reviewed_by` e a trilha.
+        messages.error(request, "Este caso já foi decidido.")
         return redirect("painel")
 
     flag.status = decisao
     flag.reviewed_by_user = _app_user(request)
     flag.reviewed_at = timezone.now()
     flag.save(update_fields=["status", "reviewed_by_user", "reviewed_at"])
-
-    # A decisao volta para a fatura -- e as duas decisoes NAO sao simetricas.
-    #
-    # Descartar significa "nao havia problema": a linha sai da auditoria.
-    # Confirmar significa o oposto -- o problema e real, e a linha PERMANECE
-    # marcada, com a fatura retida, ate que o caso se resolva. Tratar as duas
-    # como equivalentes (ambas tiram a flag de `open`) fecharia a fatura
-    # justamente no caso em que o sindico acabou de dizer que ha algo errado.
     if flag.session_id:
-        linhas = InvoiceLine.objects.filter(session_id=flag.session_id)
-        ainda_aberta = AnomalyFlag.objects.filter(
-            session_id=flag.session_id,
-            status__in=[AnomalyFlag.Status.OPEN, AnomalyFlag.Status.ACCEPTED,
-                        AnomalyFlag.Status.CONTESTED],
-        ).exists()
-        for linha in linhas:
-            linha.flagged_for_audit = ainda_aberta or linha.session.meter_stop is None
-            linha.save(update_fields=["flagged_for_audit"])
-            inv = linha.invoice
-            if not inv.lines.filter(flagged_for_audit=True).exists() and inv.status == Invoice.Status.UNDER_REVIEW:
-                inv.status = Invoice.Status.CLOSED
-                inv.save(update_fields=["status"])
+        sync_session(flag.session_id)
 
-    verbo = "confirmada" if decisao == "accepted" else "descartada"
-    messages.success(request, f"Anomalia {verbo}. Quem revisou e quando fica registrado na trilha de auditoria.")
+    if decisao == "accepted":
+        messages.success(request, "Problema confirmado. A cobrança segue retida até você registrar o desfecho do caso.")
+    else:
+        messages.success(request, "Caso encerrado sem problema: a cobrança foi liberada. A decisão fica registrada no seu nome.")
+    return redirect("painel")
+
+
+@login_required
+@require_POST
+def resolver_anomalia(request, flag_id: int):
+    """A saida do caso confirmado. Sem ela, confirmar um problema era condenar
+    a fatura a ficar retida para sempre."""
+    if not _is_manager(request):
+        raise Http404
+    flag = get_object_or_404(_flags_do_condo(_condo()), pk=flag_id, status=AnomalyFlag.Status.ACCEPTED)
+    desfecho = (request.POST.get("desfecho") or "").strip()[:500]
+    if not desfecho:
+        messages.error(request, "Descreva o que foi feito: liberar cobrança retida exige registro.")
+        return redirect("painel")
+
+    flag.status = AnomalyFlag.Status.RESOLVED
+    flag.resolution = desfecho
+    flag.resolved_at = timezone.now()
+    flag.save(update_fields=["status", "resolution", "resolved_at"])
+    if flag.session_id:
+        sync_session(flag.session_id)
+    messages.success(request, "Desfecho registrado. A cobrança foi liberada.")
     return redirect("painel")
 
 
@@ -245,8 +289,8 @@ def relatorio(request):
     """
     if not _is_manager(request):
         raise Http404
-    condo = Condominium.objects.first()
-    comp = Competence.parse(request.GET.get("competencia", str(_current_competence())))
+    condo = _condo()
+    comp = _competence_from(request)
 
     faturas = list(
         Invoice.objects.filter(condominium=condo, competence=str(comp))
@@ -319,6 +363,10 @@ def relatorio(request):
     })
 
 
+def _br(valor) -> str:
+    return "" if valor is None else str(valor).replace(".", ",")
+
+
 def _relatorio_csv(comp, faturas) -> HttpResponse:
     """Exportacao para quem vai conferir na planilha -- e sempre tem alguem."""
     import csv, io
@@ -331,11 +379,13 @@ def _relatorio_csv(comp, faturas) -> HttpResponse:
         for ln in f.lines.all():
             w.writerow([
                 comp, alvo, ln.get_kind_display(), ln.description,
-                ln.energy_kwh or "", ln.unit_price_kwh or "",
-                str(ln.amount).replace(".", ","),
+                _br(ln.energy_kwh), _br(ln.unit_price_kwh), _br(ln.amount),
                 "sim" if ln.flagged_for_audit else "não",
             ])
-    resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    # BOM na frente: sem ele o Excel abre o arquivo como Latin-1 e "não" vira
+    # "nÃ£o". E virgula decimal nos TRES numeros: com ponto, o Excel pt-BR le
+    # "11.400" kWh como onze mil e quatrocentos.
+    resp = HttpResponse("\ufeff" + buf.getvalue(), content_type="text/csv; charset=utf-8")
     resp["Content-Disposition"] = f'attachment; filename="rateio-{comp}.csv"'
     return resp
 
@@ -351,7 +401,7 @@ def extrato(request):
     if not au or not au.unit:
         raise Http404("usuário sem unidade vinculada")
 
-    comp = Competence.parse(request.GET.get("competencia", str(_current_competence())))
+    comp = _competence_from(request)
     fatura = (
         Invoice.objects.filter(unit=au.unit, competence=str(comp))
         .prefetch_related("lines__session__credential__user")
@@ -449,31 +499,102 @@ def _melhor_janela(condominium) -> dict | None:
 def contestar(request, linha_id: int):
     """Contestacao informada: o morador ve a evidencia antes de discordar."""
     au = _app_user(request)
-    linha = get_object_or_404(InvoiceLine, pk=linha_id)
-    if not au or linha.invoice.unit_id != au.unit_id:
+    linha = get_object_or_404(InvoiceLine.objects.select_related("invoice", "session"), pk=linha_id)
+    if not au or not au.unit_id or linha.invoice.unit_id != au.unit_id:
         raise Http404
+    if linha.session_id is None:
+        messages.error(request, "Só recargas podem ser contestadas por aqui. Para a taxa ou o ajuste, fale com a administração.")
+        return redirect("extrato")
 
-    motivo = (request.POST.get("motivo") or "").strip()
+    motivo = (request.POST.get("motivo") or "").strip()[:500]
     if not motivo:
         messages.error(request, "Descreva o motivo da contestação.")
+        return redirect("extrato")
+    if AnomalyFlag.objects.filter(
+        session_id=linha.session_id, detector="morador", status=AnomalyFlag.Status.CONTESTED
+    ).exists():
+        messages.info(request, "Esta recarga já está contestada e aguarda a decisão do síndico.")
         return redirect("extrato")
 
     AnomalyFlag.objects.create(
         session=linha.session,
-        charge_point=linha.session.charge_point if linha.session else None,
+        charge_point=linha.session.charge_point,
         category=AnomalyFlag.Category.CONSUMPTION,
         explanation=f"Contestação do morador ({au.name}, unidade {au.unit.label}): {motivo}",
         detector="morador",
         status=AnomalyFlag.Status.CONTESTED,
     )
-    linha.flagged_for_audit = True
-    linha.save(update_fields=["flagged_for_audit"])
-    inv = linha.invoice
-    if inv.status == Invoice.Status.CLOSED:
-        inv.status = Invoice.Status.UNDER_REVIEW
-        inv.save(update_fields=["status"])
+    sync_session(linha.session_id)
 
     messages.success(
-        request, "Contestação registrada. A linha entra na fila de auditoria do síndico."
+        request, "Contestação registrada. A recarga entrou na fila de decisão do síndico e a cobrança fica suspensa até lá."
     )
     return redirect("extrato")
+
+
+# --------------------------------------------------------------------------
+# Entrada de dados -- o que chegou, o que ficou de fora, e o que nao tem dono
+# --------------------------------------------------------------------------
+
+@login_required
+def entrada(request):
+    """A porta de entrada, vista por quem responde por ela.
+
+    Tres perguntas que o gestor faz e que nenhuma tela respondia: o dado esta
+    chegando? algo foi recusado? ha energia que ninguem assumiu?
+    """
+    if not _is_manager(request):
+        raise Http404
+    condo = _condo()
+    execucoes = list(
+        IngestionRun.objects.filter(Q(condominium=condo) | Q(condominium__isnull=True))[:8]
+    )
+    pendentes = list(
+        RawEvent.objects.filter(outcome__in=RawEvent.QUARANTINE, resolved_at__isnull=True)[:20]
+    )
+    sem_dono = orphans.orphan_summary(condo)
+    for s in sem_dono["sessoes"]:
+        s.autostart = orphans.is_autostart(s.auth_id)
+        s.valor = (Decimal(s.energy_kwh) * Decimal(s.applied_tariff_kwh or 0)).quantize(Decimal("0.01"))
+    fontes = (
+        ChargingSession.objects.filter(charge_point__condominium=condo)
+        .values("source", "measurement_source")
+        .annotate(n=Count("id"), kwh=Sum("energy_kwh"), ultima=Max("session_start"))
+        .order_by("-n")
+    )
+    moradores = (
+        AppUser.objects.filter(unit__condominium=condo, role=AppUser.Role.RESIDENT)
+        .select_related("unit").order_by("unit__label", "name")
+    )
+    return render(request, "portal/entrada.html", {
+        "condo": condo,
+        "execucoes": execucoes,
+        "pendentes": pendentes,
+        "sem_dono": sem_dono,
+        "fontes": fontes,
+        "moradores": moradores,
+    })
+
+
+@login_required
+@require_POST
+def atribuir_recarga(request, session_id: int):
+    if not _is_manager(request):
+        raise Http404
+    condo = _condo()
+    sessao = get_object_or_404(orphans.orphan_sessions(condo), pk=session_id)
+    morador = get_object_or_404(AppUser, pk=request.POST.get("morador") or 0, unit__condominium=condo)
+    try:
+        if request.POST.get("alcance") == "cartao":
+            n = orphans.register_card(condo, sessao.auth_id, morador)
+            messages.success(request, f"Cartão {sessao.auth_id} cadastrado para {morador.name}: {n} recarga(s) ganharam dono.")
+        else:
+            orphans.assign_session(sessao, morador)
+            messages.success(
+                request,
+                f"Recarga atribuída a {morador.name} (unidade {morador.unit.label}). "
+                "Entra na próxima fatura aberta; meses já fechados não são reescritos.",
+            )
+    except orphans.OrphanError as exc:
+        messages.error(request, str(exc).capitalize() + ".")
+    return redirect("entrada")

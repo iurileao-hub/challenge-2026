@@ -1,0 +1,168 @@
+{% extends "portal/base.html" %}
+{% block titulo %}Entrada de dados — EV ChargeOps{% endblock %}
+{% block conteudo %}
+
+<h1>Entrada de dados</h1>
+<p class="sub">De onde vêm as recargas de {{ condo.name }}, o que a plataforma recusou, e o que ainda não tem dono.</p>
+
+{% comment %}A pergunta que abre a pagina e a do dinheiro, nao a da tecnica:
+"ha energia que ninguem assumiu?". O diario de execucoes vem depois.{% endcomment %}
+{% if sem_dono.n %}
+<div class="faixa-estado pendente">
+  <div class="icone" aria-hidden="true">⚡</div>
+  <div class="texto">
+    <div class="titulo">
+      {{ sem_dono.n }} recarga{{ sem_dono.n|pluralize:"s" }} sem dono ·
+      {{ sem_dono.kwh|floatformat:2 }} kWh · R$ {{ sem_dono.valor|floatformat:2 }} fora do rateio
+    </div>
+    <div class="detalhe">
+      O carregador registrou a energia, mas não soube dizer quem carregou. O condomínio já pagou
+      esse valor na conta de luz. Enquanto a recarga não tiver dono, ninguém é cobrado por ela:
+      <strong>cobrar de quem não se sabe seria pior do que não cobrar.</strong>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="faixa-estado">
+  <div class="icone" aria-hidden="true">✓</div>
+  <div class="texto">
+    <div class="titulo">Toda recarga tem dono</div>
+    <div class="detalhe">Nenhuma sessão ficou fora do rateio por falta de identificação.</div>
+  </div>
+</div>
+{% endif %}
+
+{% if sem_dono.n %}
+<div class="cartao" id="sem-dono">
+  <h2>Recargas sem dono</h2>
+  <div class="rolagem">
+    <table class="empilha">
+      <tr class="cabecalho">
+        <th>Quando</th><th>O que o carregador disse</th><th class="num">Energia</th>
+        <th class="num">Valor</th><th>Dar dono</th>
+      </tr>
+      {% for s in sem_dono.sessoes %}
+      <tr>
+        <td data-rotulo="Quando" style="white-space:nowrap">{{ s.session_start|date:"d/m/Y \à\s H:i" }}</td>
+        <td data-rotulo="O que o carregador disse">
+          {% if s.autostart %}
+            <span class="selo aviso">Partida sem cartão</span>
+            <div class="nota-linha">o “cartão” reportado é o número de série do próprio carregador</div>
+          {% elif s.auth_id %}
+            <span class="selo neutro">Cartão não cadastrado</span>
+            <div class="nota-linha"><code>{{ s.auth_id }}</code></div>
+          {% else %}
+            <span class="selo neutro">Sem identificação</span>
+          {% endif %}
+          <div class="nota-linha">fonte: {{ s.source }} · {{ s.get_measurement_source_display }}</div>
+        </td>
+        <td data-rotulo="Energia" class="num">{{ s.energy_kwh|floatformat:3 }} kWh</td>
+        <td data-rotulo="Valor" class="num">R$ {{ s.valor|floatformat:2 }}</td>
+        <td data-rotulo="Dar dono" class="solo">
+          <form method="post" action="{% url 'atribuir_recarga' s.id %}" class="dar-dono">
+            {% csrf_token %}
+            <label class="sr-only" for="morador-{{ s.id }}">Morador</label>
+            <select id="morador-{{ s.id }}" name="morador" required>
+              <option value="">Escolha o morador…</option>
+              {% for m in moradores %}<option value="{{ m.id }}">Unidade {{ m.unit.label }} · {{ m.name }}</option>{% endfor %}
+            </select>
+            <button type="submit" name="alcance" value="sessao" class="liberar">Atribuir esta recarga</button>
+            {% if s.auth_id and not s.autostart %}
+            <button type="submit" name="alcance" value="cartao">Cadastrar o cartão</button>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p class="legenda">
+    Atribuir muda só o vínculo: o identificador que o equipamento reportou fica preservado na
+    trilha de auditoria. Recarga de mês já fechado entra na próxima fatura aberta, identificada
+    como tal. <strong>Fatura fechada não é reescrita.</strong>
+  </p>
+</div>
+{% endif %}
+
+<div class="cartao">
+  <h2>De onde vieram as recargas</h2>
+  <div class="rolagem">
+    <table class="empilha">
+      <tr class="cabecalho"><th>Fonte</th><th>Lastro da medição</th><th class="num">Recargas</th><th class="num">Energia</th><th>Mais recente</th></tr>
+      {% for f in fontes %}
+      <tr>
+        <td data-rotulo="Fonte"><code>{{ f.source }}</code></td>
+        <td data-rotulo="Lastro da medição">
+          {% if f.measurement_source == "mid_meter" %}<span class="selo ok">Medidor certificado (MID)</span>
+          {% elif f.measurement_source == "modbus_local" %}<span class="selo neutro">Leitura local (Modbus)</span>
+          {% else %}<span class="selo neutro">Nuvem do fabricante</span>{% endif %}
+        </td>
+        <td data-rotulo="Recargas" class="num">{{ f.n }}</td>
+        <td data-rotulo="Energia" class="num">{{ f.kwh|floatformat:2 }} kWh</td>
+        <td data-rotulo="Mais recente">{{ f.ultima|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="vazio">Nenhuma recarga registrada ainda.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p class="legenda">
+    Toda fonte entra pelo mesmo gateway e sai no mesmo formato. O motor de rateio, a detecção de
+    anomalias e esta tela não sabem, nem precisam saber, de onde o dado veio.
+  </p>
+</div>
+
+<div class="cartao">
+  <h2>Quarentena</h2>
+  {% if pendentes %}
+  <div class="rolagem">
+    <table class="empilha">
+      <tr class="cabecalho"><th>Recebido</th><th>Fonte</th><th>Situação</th><th>Por que não entrou</th></tr>
+      {% for e in pendentes %}
+      <tr>
+        <td data-rotulo="Recebido" style="white-space:nowrap">{{ e.received_at|date:"d/m H:i" }}</td>
+        <td data-rotulo="Fonte"><code>{{ e.source }}</code></td>
+        <td data-rotulo="Situação"><span class="selo {% if e.outcome == 'conflict' %}perigo{% else %}aviso{% endif %}">{{ e.get_outcome_display }}</span></td>
+        <td data-rotulo="Por que não entrou" class="solo">{{ e.reason }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p class="legenda">
+    Registro recusado não é registro perdido: o conteúdo original fica guardado e volta a ser
+    processado depois que a causa é corrigida (<code>manage.py ingest --replay</code>).
+  </p>
+  {% else %}
+  <p class="vazio" style="padding-left:0">Nada em quarentena. Tudo o que as fontes entregaram foi aceito.</p>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Últimas entregas</h2>
+  <div class="rolagem">
+    <table class="empilha">
+      <tr class="cabecalho"><th>Quando</th><th>Fonte</th><th>Como chegou</th><th class="num">Recebidos</th><th class="num">Novas</th><th class="num">Atualizadas</th><th class="num">Repetidos</th><th class="num">Quarentena</th></tr>
+      {% for r in execucoes %}
+      <tr>
+        <td data-rotulo="Quando" style="white-space:nowrap">{{ r.started_at|date:"d/m H:i" }}</td>
+        <td data-rotulo="Fonte"><code>{{ r.source }}</code></td>
+        <td data-rotulo="Como chegou">{{ r.get_mode_display }}
+          {% if r.status == "failed" %}<span class="selo perigo">falhou</span>{% endif %}</td>
+        <td data-rotulo="Recebidos" class="num">{{ r.received }}</td>
+        <td data-rotulo="Novas" class="num">{{ r.created }}</td>
+        <td data-rotulo="Atualizadas" class="num">{{ r.updated }}</td>
+        <td data-rotulo="Repetidos" class="num">{{ r.duplicates }}</td>
+        <td data-rotulo="Quarentena" class="num">{{ r.rejected|add:r.unknown_point|add:r.conflicts }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="vazio">Nenhuma entrega registrada. Rode <code>manage.py ingest semsplus_log</code>.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p class="legenda">
+    “Repetidos” é a idempotência trabalhando: a fonte reentregou o que a plataforma já tinha, e
+    nada foi cobrado duas vezes.
+  </p>
+</div>
+
+{% endblock %}

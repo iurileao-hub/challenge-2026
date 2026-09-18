@@ -68,12 +68,14 @@ sozinho deixa sem resposta a pergunta que mais importa: eu pago ou nao pago?{% e
           {% endif %}
           {% if l.flagged_for_audit %}
             <div style="font-size:12.5px;color:var(--warn);margin-top:5px">
-              <strong>Esta recarga está em revisão.</strong> Cobramos pela última leitura
-              confirmada, que é o menor valor possível. O síndico confere antes do fechamento.
+              <strong>Esta recarga está em revisão.</strong>
+              {% if l.session.final_reading_lost %}A leitura final do medidor não chegou: cobramos
+              pela última leitura confirmada, que é o menor valor possível.{% endif %}
+              A cobrança fica suspensa até o síndico decidir.
             </div>
           {% endif %}
         </td>
-        <td data-rotulo="kWh" class="num {% if not l.energy_kwh %}sem-valor{% endif %}">{% if l.energy_kwh %}{{ l.energy_kwh|floatformat:1 }}{% else %}—{% endif %}</td>
+        <td data-rotulo="kWh" class="num {% if not l.energy_kwh %}sem-valor{% endif %}">{% if l.energy_kwh %}{{ l.energy_kwh|floatformat:3 }}{% else %}—{% endif %}</td>
         <td data-rotulo="Preço por kWh" class="num {% if not l.unit_price_kwh %}sem-valor{% endif %}">{% if l.unit_price_kwh %}R$ {{ l.unit_price_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
         <td data-rotulo="Valor" class="num"><strong>R$ {{ l.amount|floatformat:2 }}</strong></td>
         <td class="solo">

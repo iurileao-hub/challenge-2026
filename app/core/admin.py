@@ -302,7 +302,14 @@ class SeguraFaturaFilter(admin.SimpleListFilter):
         return (("1", "Segurando a fatura"), ("0", "Não segura"))
 
     def queryset(self, request, queryset):
-        # TODO(Iúri): implementar. Ver a conversa -- há uma escolha real aqui.
+        # A regra mora em `holding()` e só lá: o filtro a consulta, não a copia.
+        # "Não segura" é o complemento puro, para concordar com a coluna
+        # `segura fatura` -- inclui os casos encerrados E as flags operacionais,
+        # que nunca seguraram nada. Quem quer só os encerrados filtra por situação.
+        if self.value() == "1":
+            return queryset.holding()
+        if self.value() == "0":
+            return queryset.exclude(pk__in=queryset.holding().values("pk"))
         return queryset
 
 

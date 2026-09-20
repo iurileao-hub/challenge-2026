@@ -1,0 +1,7 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{# Estende o template de mesmo nome do proprio Django (o loader pula esta origem) #}
+{# so para dar ao admin o favicon que o portal ja tem: os dois nao dividem <head>. #}
+{% block extrahead %}{{ block.super }}
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+{% endblock %}

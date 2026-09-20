@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>EV ChargeOps</title>
+  <!-- O verde e o token "accent" de css/chargeops.css; o raio do canto ecoa
+       o token "radius" dos cartoes. Uma forma, uma cor: a 16 px e o que
+       sobrevive. (Os tokens vao sem os dois hifens: XML os proibe em comentario.) -->
+  <style>
+    .selo { fill: #0f6b4f; }
+    /* Na aba escura o verde fechado some contra o cinza do navegador. */
+    @media (prefers-color-scheme: dark) { .selo { fill: #2e9c7a; } }
+  </style>
+  <rect class="selo" width="32" height="32" rx="7"/>
+  <path fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"
+        d="M18.5 5 9 18h6l-1.5 9L23 14h-6z"/>
+</svg>

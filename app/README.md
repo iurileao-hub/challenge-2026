@@ -396,6 +396,7 @@ portal/                        as duas interfaces
   context.py                   dados comuns aos templates
 
 templates/portal/              HTML das telas
+templates/admin/base_site.html estende o admin do Django só para lhe dar o favicon
 static/                        CSS e imagens
 ```
 

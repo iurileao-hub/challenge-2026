@@ -422,7 +422,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 92 testes
+uv run pytest                    # 100 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -434,7 +434,9 @@ Distribuição da suíte:
 | `portal/tests/test_portal.py` | 28 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), as duas filas do painel, promoção de sugestão a retenção, recarga sem dono até a fatura |
 | `intelligence/tests/test_deteccao.py` | 21 | Detecção nas duas fases, o ciclo de estados da fatura, a regra de retenção em todas as combinações de categoria, detector e situação, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria, o alerta de fila e a janela de pernoite na regra de ociosidade |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
-| `ingestion/tests/test_robustez.py` | 19 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado, as 18 sessões reais do HCA G2, e os invariantes de banco |
+| `ingestion/tests/test_robustez.py` | 22 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado e as recusas do endpoint (405, 401, 503, 400, 413), as 18 sessões reais do HCA G2, e os invariantes de banco |
+| `core/tests/test_admin.py` | 2 | O filtro de retenção de fatura do admin concorda com a regra de domínio (`holds_billing`) em todas as combinações |
+| `portal/tests/test_favicon.py` | 3 | O favicon é declarado no portal e no admin, aponta para um estático que existe, e o estático é um SVG válido |
 
 A suíte de aceitação reproduz o mês fictício de junho/2026 do dossiê: as três faturas
 (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes de

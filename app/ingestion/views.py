@@ -18,8 +18,9 @@ relogio sincronizado sem fechar nenhum buraco real.
 A resposta e 200 mesmo quando ha registros recusados: o LOTE foi recebido e
 esta guardado; recusa individual vai para a quarentena e vem discriminada no
 corpo. Responder 4xx faria a fonte reenviar para sempre um lote que nunca vai
-passar. So respondem com erro a assinatura invalida (401), o corpo ilegivel
-(400) e o endpoint desligado (503).
+passar. So respondem com erro as recusas do LOTE inteiro, que nao abrem
+execucao no diario: metodo que nao e POST (405), endpoint desligado (503),
+assinatura invalida (401), corpo ilegivel (400) e lote acima de MAX_EVENTS (413).
 """
 
 import hashlib

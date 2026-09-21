@@ -28,7 +28,7 @@ from ingestion.adapters import EventStreamAdapter, SemsPlusLogAdapter, SemsStubA
 from ingestion.gateway import CanonicalSession, IngestionGateway
 from ingestion.models import IngestionRun, RawEvent
 from ingestion.replay import replay_quarantine
-from ingestion.views import sign
+from ingestion.views import MAX_EVENTS, sign
 
 BRT = ZoneInfo("America/Sao_Paulo")
 SERIAL = "57000HPA247L0002"
@@ -347,6 +347,34 @@ def test_push_com_lixo_responde_200_e_guarda_o_lixo(cenario, push):
     resp = push({"events": [{"type": "explodiu"}, "nem objeto", _fluxo()[4]]})
     assert resp.status_code == 200
     assert resp.json()["quarantined"] == 2 and resp.json()["telemetry"] == 1
+
+
+def test_push_so_aceita_post(client, settings):
+    """O `require_POST` barra antes da view: nem a assinatura chega a ser lida."""
+    settings.INGEST_PUSH_SECRETS = {"goodwe_push": "segredo-de-teste"}
+    resp = client.get("/api/v1/ingest/goodwe_push/")
+    assert resp.status_code == 405
+    assert resp.headers["Allow"] == "POST"
+
+
+def test_push_com_corpo_ilegivel_responde_400_e_nao_abre_execucao(cenario, push, client):
+    """Assinatura certa sobre um corpo que nao e o contrato: recusa do LOTE, nao do registro."""
+    torto = b'{"events": [ isto nao e json'
+    resp = client.post(
+        "/api/v1/ingest/goodwe_push/", data=torto, content_type="application/json",
+        headers={"X-ChargeOps-Signature": sign(torto, "segredo-de-teste")},
+    )
+    assert resp.status_code == 400
+    assert push({"eventos": []}).status_code == 400  # objeto sem a chave `events`
+    assert push({"events": "nao e lista"}).status_code == 400
+    assert not IngestionRun.objects.exists()
+
+
+def test_push_acima_do_limite_responde_413_sem_ingerir_nada(cenario, push):
+    assert push({"events": [{}] * (MAX_EVENTS + 1)}).status_code == 413
+    assert not IngestionRun.objects.exists()
+    # O limite e inclusivo: exatamente MAX_EVENTS passa pela porta.
+    assert push({"events": [{}] * MAX_EVENTS}).status_code == 200
 
 
 # ---------------------------------------------------- invariantes de banco

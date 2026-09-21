@@ -14,7 +14,7 @@
 
 Três níveis de evidência, mantendo a convenção dos dossiês da Sprint 1:
 
-- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (92 testes).
+- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (100 testes).
 - **Verificado na Sprint 1.** O que se afirma sobre o HCA G2 e o SEMS+ vem dos dossiês já entregues, que citam fonte primária: [`frente-2-regulatorio.md`](frente-2-regulatorio.md) (datasheet e manual G2 V1.5) e [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md) (observação direta da plataforma, nível [O]). Nenhuma fonte nova é citada aqui.
 - **Inferência da equipe.** As arquiteturas propostas são desenho nosso. Não tivemos acesso ao mapa de registradores Modbus do HCA G2 nem à OpenAPI de desenvolvedor do SEMS. Onde uma proposta depende de algo que não pudemos verificar, o texto diz.
 
@@ -54,6 +54,7 @@ Nenhuma caixa à direita do gateway conhece a fonte. Essa era a tese da Sprint 1
 | Fatura fechada não é reescrita nem pela própria ingestão. Correção tardia da fonte vira conflito para decisão humana | `gateway._update_existing` | `test_fatura_fechada_nao_e_reescrita_por_correcao_tardia_da_fonte` |
 | Consulta incremental por marca d'água: só o que é novo desde a última execução | `IngestionRun.cursor_after` | `test_pull_incremental_so_traz_o_que_e_novo` |
 | Webhook autenticado por HMAC-SHA256 do corpo, com segredo por fonte. Fonte sem segredo configurado fica desligada | `ingestion/views.py` | `test_push_assinado_entra_e_assinatura_errada_nao`, `test_push_de_fonte_sem_segredo_configurado_fica_desligado` |
+| O endpoint recusa o LOTE antes de abrir execução no diário: método que não é POST (405), corpo que não é o contrato (400) e lote acima de 5.000 eventos (413). Lixo DENTRO de um lote legível é outro caso: responde 200 e vai para a quarentena | `ingestion/views.py` | `test_push_so_aceita_post`, `test_push_com_corpo_ilegivel_responde_400_e_nao_abre_execucao`, `test_push_acima_do_limite_responde_413_sem_ingerir_nada`, `test_push_com_lixo_responde_200_e_guarda_o_lixo` |
 | Sessão de mês já fechado que aparece depois (órfã vinculada, entrega atrasada) entra na próxima fatura, identificada | `billing/engine.late_sessions` | `test_recarga_sem_dono_ganha_dono_e_entra_na_proxima_fatura` |
 
 A fronteira entre a ingestão e a IA é explícita: **o gateway recusa o que é impossível de armazenar; o detector sinaliza o que é implausível.** Sessão de 0 kWh entra. Sessão de 90 kWh num carro de 40 entra, e a detecção a pega. Sessão que termina antes de começar não entra.

@@ -219,7 +219,7 @@ rótulos de exibição. Nenhuma entidade nova, nenhum campo de emergência. Os n
 banco são idênticos aos do dicionário do dossiê, justamente para tornar essa conferência
 possível linha a linha.
 
-O mês fictício de junho/2026 virou **suíte de aceitação**: 18 testes reproduzem as três
+O mês fictício de junho/2026 virou **suíte de aceitação**: 19 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
 escrito meses antes do código, e não lidos da implementação. São 100 testes no total.

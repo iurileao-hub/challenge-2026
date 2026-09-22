@@ -488,7 +488,7 @@ def _melhor_janela(condominium) -> dict | None:
     """
     desde = datetime.combine(DEMO_TODAY - timedelta(days=90), time.min, tzinfo=condo_tz())
     sessoes = ChargingSession.objects.filter(
-        charge_point__condominium=condominium, session_start__gte=desde
+        charge_point__condominium=condominium, session_start__gte=desde, session_start__lt=desde + timedelta(days=91)
     ).values_list("session_start", flat=True)
 
     contagem = [0] * 24

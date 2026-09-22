@@ -379,7 +379,7 @@ def test_fase_2_se_abstem_quando_a_fonte_nao_entrega_telemetria(db):
     tz = ZoneInfo("America/Sao_Paulo")
     run_detection(condo, datetime(2026, 5, 25, tzinfo=tz), datetime(2026, 6, 30, 23, 59, tzinfo=tz))
 
-    assert ChargingSession.objects.filter(source="semsplus_log").count() == 18
+    assert ChargingSession.objects.filter(source="semsplus_log").count() == 72
     assert not AnomalyFlag.objects.filter(session__source="semsplus_log").exists()
 
 

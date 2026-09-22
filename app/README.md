@@ -334,10 +334,17 @@ motivo legível, e volta a ser processado por `manage.py ingest --replay`.
 O desenho, as garantias (cada uma com o teste que a prova) e a proposta de integração com a
 GoodWe estão em [`docs/sprint2-ingestao-e-integracao.md`](../docs/sprint2-ingestao-e-integracao.md).
 
-O `pipeline` começa ingerindo o primeiro dado real do projeto: as 18 sessões do HCA G2 do
-laboratório da FIAP, observadas no SEMS+. Todas chegam sem dono, porque o carregador operava
-em partida automática. Elas aparecem em **Entrada de dados**, com o valor em reais que ficou
-fora do rateio, e o gestor atribui dono a cada uma.
+O `pipeline` começa ingerindo o primeiro dado real do projeto: as 72 sessões do HCA G2 do
+laboratório da FIAP, de 27/05 a 22/09/2026 (570,17 kWh), coletadas no SEMS+ em 22/09. Todas
+chegam sem dono, porque o carregador operava em partida automática: R$ 438,21 que ficaram
+fora do rateio, pela tarifa da vigência de cada recarga. Elas aparecem em **Entrada de
+dados**, e o gestor atribui dono a cada uma.
+
+O histórico real passa da data fixa da demonstração (30/06/2026). A decisão foi ingerir tudo,
+porque é o que a fonte entregou, e mostrar os dois números lado a lado: o total e o recorte
+da competência (junho: 19 recargas, 137,76 kWh, R$ 99,91). Recarga sem dono não entra no
+rateio, então o mês fictício do dossiê não muda; e as consultas que olham "os últimos dias"
+param na data da demonstração.
 
 ## 7. Mapa de rotas
 
@@ -422,7 +429,7 @@ ele produz um número que pode reprovar o modelo.
 ## 10. Verificação
 
 ```bash
-uv run pytest                    # 100 testes
+uv run pytest                    # 106 testes
 uv run pytest -m "not slow"      # sem os que geram meses de dados
 ```
 
@@ -434,7 +441,7 @@ Distribuição da suíte:
 | `portal/tests/test_portal.py` | 28 | Interfaces, autorização por papel, contestação, ciclo de vida da anomalia (decidir, confirmar, registrar desfecho), as duas filas do painel, promoção de sugestão a retenção, recarga sem dono até a fatura |
 | `intelligence/tests/test_deteccao.py` | 21 | Detecção nas duas fases, o ciclo de estados da fatura, a regra de retenção em todas as combinações de categoria, detector e situação, as propriedades físicas do gerador (um carro por conector), a abstenção sem telemetria, o alerta de fila e a janela de pernoite na regra de ociosidade |
 | `ingestion/tests/test_gateway.py` | 5 | Fontes diferentes entrando pelo mesmo caminho |
-| `ingestion/tests/test_robustez.py` | 22 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado e as recusas do endpoint (405, 401, 503, 400, 413), as 18 sessões reais do HCA G2, e os invariantes de banco |
+| `ingestion/tests/test_robustez.py` | 28 | O que o gateway garante diante de uma fonte de verdade: idempotência, ciclo de vida, quarentena e replay, eventos fora de ordem, duas fontes para a mesma recarga, webhook assinado e as recusas do endpoint (405, 401, 503, 400, 413), as 72 sessões reais do HCA G2 (deduplicação pelo id da fonte, conferência com a transcrição de junho, troca de tarifa em 04/07, duas recargas a 76 segundos), e os invariantes de banco |
 | `core/tests/test_admin.py` | 2 | O filtro de retenção de fatura do admin concorda com a regra de domínio (`holds_billing`) em todas as combinações |
 | `portal/tests/test_favicon.py` | 3 | O favicon é declarado no portal e no admin, aponta para um estático que existe, e o estático é um SVG válido |
 

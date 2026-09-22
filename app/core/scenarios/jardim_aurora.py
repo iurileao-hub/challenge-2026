@@ -39,6 +39,13 @@ from core.models import (
 BRT = ZoneInfo("America/Sao_Paulo")
 
 PRICE_KWH = Decimal("0.7252")
+#: Reajuste anual da Enel SP (B3 convencional, sem tributos), consultado no
+#: datastore da ANEEL em 22/09/2026: REH 3.596/2026, TUSD 472,42 + TE 316,96 =
+#: R$ 789,38/MWh, vigente de 04/07/2026 a 03/07/2027. Nao toca o mes ficticio
+#: (junho continua a 0,7252); vale para o que comeca a partir de 04/07, como as
+#: recargas reais do HCA G2 coletadas no SEMS+.
+PRICE_KWH_2026_07 = Decimal("0.7894")
+REAJUSTE_2026_07 = date(2026, 7, 4)
 AVAILABILITY_FEE = Decimal("180.00")
 N_ENROLLED = 12
 OTHER_ENROLLED_LABELS = ["12", "21", "45", "58", "63", "87", "91", "102", "110"]
@@ -109,6 +116,16 @@ def build_jardim_aurora(*, extra_residents: bool = False) -> dict:
         basis="homologada ANEEL Enel SP B3 (REH 3.477/2025) - bootstrap, sem tributos",
         assembly_ref="Ata da AGO de 12/03/2026",
         valid_from=date(2026, 1, 1),
+        valid_to=date(2026, 7, 3),
+    )
+    # Vigencia nova, e nao valor reescrito: o que ja foi cobrado a 0,7252 continua
+    # a 0,7252 (decisao 4). Sem ata: o cenario nao inventa assembleia.
+    TariffPeriod.objects.create(
+        condominium=condo,
+        price_kwh=PRICE_KWH_2026_07,
+        availability_fee_month=AVAILABILITY_FEE,
+        basis="homologada ANEEL Enel SP B3 (REH 3.596/2026) - sem tributos",
+        valid_from=REAJUSTE_2026_07,
         valid_to=None,
     )
 

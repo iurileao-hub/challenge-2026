@@ -1,6 +1,6 @@
 """Porta de entrada de dados pela linha de comando.
 
-    manage.py ingest semsplus_log              # as 18 sessoes reais do HCA G2 da FIAP
+    manage.py ingest semsplus_log              # as 72 sessoes reais do HCA G2 da FIAP
     manage.py ingest sems_stub --path x.json   # payload no contrato SEMS
     manage.py ingest sems_stub --path x.json --resume   # so o que e novo desde a ultima vez
     manage.py ingest --replay                  # reprocessa a quarentena

@@ -43,8 +43,16 @@ def orphan_sessions(condominium):
     )
 
 
-def orphan_summary(condominium) -> dict:
-    sessoes = list(orphan_sessions(condominium))
+def orphan_summary(condominium, *, start=None, end=None) -> dict:
+    """Quantas, quantos kWh e quanto em reais, pela tarifa congelada de cada uma.
+
+    `start`/`end` recortam pelo inicio da sessao (a regra da competencia)."""
+    qs = orphan_sessions(condominium)
+    if start is not None:
+        qs = qs.filter(session_start__gte=start)
+    if end is not None:
+        qs = qs.filter(session_start__lte=end)
+    sessoes = list(qs)
     kwh = sum((Decimal(s.energy_kwh) for s in sessoes), Decimal("0.000"))
     valor = sum(
         (round2(Decimal(s.energy_kwh) * Decimal(s.applied_tariff_kwh or 0)) for s in sessoes),

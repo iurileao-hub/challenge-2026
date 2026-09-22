@@ -80,32 +80,27 @@ def test_sessao_em_andamento_e_encerrada_pela_entrega_seguinte(gw, tmp_path):
     assert s.energy_kwh == Decimal("15.500")
     assert s.meter_stop == Decimal("2015.500")
     # A tarifa congela quando a sessao ENCERRA na plataforma, nao quando abre.
-    assert s.applied_tariff_kwh == Decimal("0.7252")
+    # 10/07 ja esta na vigencia da REH 3.596/2026.
+    assert s.applied_tariff_kwh == Decimal("0.7894")
     assert ChargingSession.objects.filter(charge_point__serial_number=SERIAL,
                                           session_start=s.session_start).count() == 1
 
 
 def test_sessao_de_tarifa_ja_encerrada_recebe_a_vigencia_da_sua_data(cenario, gw, tmp_path):
     """Backfill depois de um reajuste. A v1 so enxergava a vigencia ABERTA:
-    a sessao antiga saia sem tarifa, violava o CHECK e derrubava o lote."""
-    antiga = TariffPeriod.objects.get(condominium=cenario["condominium"])
-    antiga.valid_to = date(2026, 7, 31)
-    antiga.save()
-    TariffPeriod.objects.create(
-        condominium=cenario["condominium"], price_kwh=Decimal("0.8100"),
-        availability_fee_month=Decimal("180.00"), basis="reajuste ago/2026",
-        valid_from=date(2026, 8, 1),
-    )
+    a sessao antiga saia sem tarifa, violava o CHECK e derrubava o lote.
+
+    O reajuste e o real: REH 3.477/2025 ate 03/07/2026, REH 3.596/2026 desde 04/07."""
     recs = [
-        _rec(id="JUL", start_time="2026-07-31T22:00:00", end_time="2026-07-31T23:30:00"),
-        _rec(id="AGO", start_time="2026-08-01T22:00:00", end_time="2026-08-01T23:30:00",
+        _rec(id="JUL03", start_time="2026-07-03T22:00:00", end_time="2026-07-03T23:30:00"),
+        _rec(id="JUL04", start_time="2026-07-04T22:00:00", end_time="2026-07-04T23:30:00",
              start_kwh=2015.5, end_kwh=2031.0),
     ]
     r = gw.ingest(SemsStubAdapter(), payload_path=_payload(tmp_path, recs))
 
     assert r.created == 2 and r.rejected == 0
-    assert ChargingSession.objects.get(source_ref="sems:JUL").applied_tariff_kwh == Decimal("0.7252")
-    assert ChargingSession.objects.get(source_ref="sems:AGO").applied_tariff_kwh == Decimal("0.8100")
+    assert ChargingSession.objects.get(source_ref="sems:JUL03").applied_tariff_kwh == Decimal("0.7252")
+    assert ChargingSession.objects.get(source_ref="sems:JUL04").applied_tariff_kwh == Decimal("0.7894")
 
 
 # ---------------------------------------------------- isolamento e quarentena
@@ -262,7 +257,7 @@ def test_eventos_fora_de_ordem_e_repetidos_montam_uma_sessao_so(cenario):
     assert s.status == "completed" and s.stop_reason == "EVDisconnected"
     assert s.energy_kwh == Decimal("17.100")           # derivada do medidor: 3017.1 - 3000.0
     assert s.credential == cenario["credentials"]["RFID-CARLA"]
-    assert s.applied_tariff_kwh == Decimal("0.7252")
+    assert s.applied_tariff_kwh == Decimal("0.7894")        # 15/07: REH 3.596/2026
     assert s.readings.count() == 2                     # as duas leituras, sem a repetida
     fora = TelemetryReading.objects.get(kind="heartbeat", ts__hour=1)   # 22h BRT = 01h UTC
     assert fora.session is None                        # heartbeat depois do fim: fora de sessao
@@ -288,20 +283,115 @@ def test_fim_que_chega_antes_do_inicio_espera_e_se_resolve(cenario):
 
 # ---------------------------------------------------------------- dado real
 
-def test_as_18_sessoes_reais_do_hca_g2_atravessam_o_gateway(cenario, gw):
-    """O limite declarado da Sprint 2, fechado: dado real de um HCA G2."""
+def test_as_72_sessoes_reais_do_hca_g2_atravessam_o_gateway(cenario, gw):
+    """O limite declarado da Sprint 2, fechado: dado real de um HCA G2.
+
+    Coleta de 22/09/2026 no SEMS+: 72 sessoes unicas, de 27/05 a 22/09/2026."""
     r = gw.ingest(SemsPlusLogAdapter())
 
     reais = ChargingSession.objects.filter(source="semsplus_log")
-    assert (r.received, r.created, r.rejected) == (18, 18, 0)
-    assert sum(s.energy_kwh for s in reais) == Decimal("136.660")     # o total do dossie
-    assert reais.filter(energy_kwh=0).count() == 1                    # a sessao #8, como veio
+    assert (r.received, r.created, r.rejected) == (72, 72, 0)
+    assert sum(s.energy_kwh for s in reais) == Decimal("570.170")
+    primeira, ultima = reais.order_by("session_start").first(), reais.order_by("session_start").last()
+    assert primeira.session_start == datetime(2026, 5, 27, 20, 55, 5, tzinfo=BRT)
+    assert ultima.session_start == datetime(2026, 9, 22, 3, 39, 31, tzinfo=BRT)
+    # Sessao de ~0 kWh entra como veio: quatro com 0,00 e uma com 0,01.
+    assert reais.filter(energy_kwh=0).count() == 4
+    assert reais.filter(energy_kwh__lt=Decimal("0.05")).count() == 5
     # A fonte nao reporta medidor: nulo declarado, e NAO "leitura final perdida".
     assert all(s.meter_start is None and not s.final_reading_lost for s in reais)
     # Auto-start: o cartao e o proprio numero de serie. Ninguem se identificou.
     assert all(s.credential is None and s.auth_id == SERIAL for s in reais)
+    # O id de sessao da fonte vira a referencia de idempotencia.
+    assert all(s.source_ref.startswith(f"semsplus:{SERIAL}2026") for s in reais)
 
-    assert gw.ingest(SemsPlusLogAdapter()).duplicates == 18
+    assert gw.ingest(SemsPlusLogAdapter()).duplicates == 72
+
+
+def test_as_72_recargas_reais_ficam_sem_dono_com_o_valor_pelo_motor(cenario, gw):
+    """O numero do pitch, calculado pelo motor: centavo por sessao, em Decimal,
+    com a tarifa da vigencia de cada recarga (REH 3.477/2025 ate 03/07/2026,
+    REH 3.596/2026 desde 04/07)."""
+    from ingestion.orphans import orphan_summary
+
+    gw.ingest(SemsPlusLogAdapter())
+    orfas = orphan_summary(cenario["condominium"])
+    assert orfas["n"] == 72
+    assert orfas["kwh"] == Decimal("570.170")
+    assert orfas["valor"] == Decimal("438.21")
+    # O recorte da competencia de demonstracao, que o `pipeline` mostra ao lado.
+    junho = orphan_summary(cenario["condominium"], start=datetime(2026, 6, 1, tzinfo=BRT),
+                           end=datetime(2026, 6, 30, 23, 59, 59, tzinfo=BRT))
+    assert (junho["n"], junho["kwh"], junho["valor"]) == (19, Decimal("137.760"), Decimal("99.91"))
+
+
+def test_recargas_reais_mudam_de_tarifa_no_reajuste_de_04_07(cenario, gw):
+    """A vigencia se decide pela data de INICIO no fuso do condominio, a mesma
+    regra da competencia. A recarga de 03/07 19:58 que terminou em 04/07 00:29
+    fica na tarifa antiga, como ficaria na fatura de julho."""
+    gw.ingest(SemsPlusLogAdapter())
+    reais = ChargingSession.objects.filter(source="semsplus_log")
+    antes = reais.filter(session_start__lt=datetime(2026, 7, 4, tzinfo=BRT))
+    depois = reais.filter(session_start__gte=datetime(2026, 7, 4, tzinfo=BRT))
+    assert (antes.count(), depois.count()) == (23, 49)
+    assert set(antes.values_list("applied_tariff_kwh", flat=True)) == {Decimal("0.7252")}
+    assert set(depois.values_list("applied_tariff_kwh", flat=True)) == {Decimal("0.7894")}
+    virada = reais.get(session_start=datetime(2026, 7, 3, 19, 58, 7, tzinfo=BRT))
+    assert virada.session_end.astimezone(BRT).date() == date(2026, 7, 4)
+    assert virada.applied_tariff_kwh == Decimal("0.7252")
+
+
+def test_duas_recargas_com_inicio_a_76_segundos_nao_viram_uma(cenario, gw):
+    """28/07/2026 no HCA G2 real: tentativa de 0 kWh (17:13:14 a 17:13:34) e
+    recarga de 15,52 kWh as 17:14:30. A janela de tolerancia de relogio, sozinha,
+    tratava a segunda como duplicata da primeira e perdia 15,52 kWh."""
+    gw.ingest(SemsPlusLogAdapter())
+    dia = ChargingSession.objects.filter(
+        source="semsplus_log",
+        session_start__gte=datetime(2026, 7, 28, 17, 0, tzinfo=BRT),
+        session_start__lt=datetime(2026, 7, 28, 18, 0, tzinfo=BRT),
+    ).order_by("session_start")
+    assert [s.energy_kwh for s in dia] == [Decimal("0.000"), Decimal("15.520")]
+
+
+def test_sessao_repetida_no_arquivo_entra_uma_vez_so(cenario, gw, tmp_path):
+    """Janelas de consulta se sobrepoem: a mesma sessao vem em duas paginas.
+    A chave e o `chargeSerialNumber`, e nao a posicao no arquivo."""
+    from ingestion.semsplus_raw import LOG_PATH
+
+    linhas = LOG_PATH.read_text(encoding="utf-8").splitlines()
+    dup = tmp_path / "dup.csv"
+    dup.write_text("\n".join([linhas[0], linhas[1], linhas[2], linhas[1]]) + "\n", encoding="utf-8")
+    r = gw.ingest(SemsPlusLogAdapter(), path=dup)
+    assert (r.received, r.created) == (2, 2)
+
+
+def test_paginas_brutas_sobrepostas_viram_72_sessoes(tmp_path):
+    """Do JSON bruto ao CSV: deduplica por `chargeSerialNumber` e preserva o
+    numero como a fonte o escreveu (sem passar pelo float)."""
+    from ingestion.semsplus_raw import merge_raw_pages
+
+    def pagina(nome, *recs):
+        p = tmp_path / nome
+        p.write_text(json.dumps({"code": "00000", "data": {"dataList": list(recs)}}), encoding="utf-8")
+        return p
+
+    a = {"chargeSerialNumber": "X1", "chargeStartTime": "2026-07-01 20:00:00.000", "currentChargeQuantity": 10.7}
+    b = {"chargeSerialNumber": "X2", "chargeStartTime": "2026-06-30 20:00:00.000", "currentChargeQuantity": 0.0}
+    unicas = merge_raw_pages([pagina("p1.json", a, b), pagina("p2.json", a)])
+    assert [r["chargeSerialNumber"] for r in unicas] == ["X2", "X1"]
+    assert unicas[1]["currentChargeQuantity"] == "10.7"
+
+
+def test_as_18_da_transcricao_de_junho_conferem_com_o_json(cenario, gw):
+    """A transcricao da tela (26/06) e o JSON (22/09) sao a mesma fonte: as 18
+    sessoes batem em inicio, fim e energia, e reingeri-las nao duplica nada."""
+    from ingestion.semsplus_raw import LOG_PATH_2026_06
+
+    gw.ingest(SemsPlusLogAdapter())
+    r = gw.ingest(SemsPlusLogAdapter(), path=LOG_PATH_2026_06)
+    assert (r.received, r.created, r.duplicates) == (18, 0, 18)
+    assert ChargingSession.objects.filter(source="semsplus_log").count() == 72
 
 
 def test_sessao_orfa_real_nao_entra_no_rateio_nem_retem_fatura(cenario, gw):
@@ -395,7 +485,7 @@ def test_invariantes_de_banco_vigencias_nao_se_sobrepoem(cenario):
 
 def test_vigencia_que_termina_no_dia_em_que_a_outra_comeca_e_recusada(cenario):
     """Intervalo FECHADO: `valid_to` e inclusivo no motor, tem de ser no banco."""
-    t = TariffPeriod.objects.get(condominium=cenario["condominium"])
+    t = TariffPeriod.objects.get(condominium=cenario["condominium"], valid_to__isnull=True)
     t.valid_to = date(2026, 7, 10)
     t.save()
     with pytest.raises(IntegrityError), transaction.atomic():

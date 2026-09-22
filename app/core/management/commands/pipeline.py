@@ -62,6 +62,18 @@ class Command(BaseCommand):
                 f"      {orfas['n']} recarga(s) SEM DONO: {orfas['kwh']} kWh, R$ {orfas['valor']} "
                 "fora do rateio ate alguem assumir (painel > Entrada de dados)"
             ))
+            # O historico real passa da data da demonstracao (a coleta e de
+            # 22/09). Ingere-se tudo, porque e o que a fonte entregou; o recorte
+            # da competencia vem ao lado, para nao misturar os dois numeros.
+            mes = orphan_summary(
+                condo,
+                start=datetime.combine(comp.first_day, time.min, tzinfo=tz),
+                end=datetime.combine(comp.last_day, time.max, tzinfo=tz),
+            )
+            if mes["n"] != orfas["n"]:
+                datas = [s.session_start.astimezone(tz).date() for s in orfas["sessoes"]]
+                w(f"      de {min(datas):%d/%m/%Y} a {max(datas):%d/%m/%Y}; so na competencia {comp}: "
+                  f"{mes['n']} recarga(s), {mes['kwh']} kWh, R$ {mes['valor']}")
 
         w(self.style.MIGRATE_HEADING(f"\n[2/5] Deteccao de anomalias — competencia {comp}"))
         inicio = datetime.combine(comp.first_day, time.min, tzinfo=tz)

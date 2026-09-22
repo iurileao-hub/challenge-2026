@@ -421,7 +421,7 @@ def test_recarga_sem_dono_ganha_dono_e_entra_na_proxima_fatura(client, cenario):
 
     entrar(client, "sindica")
     html = client.get("/painel/entrada/").content.decode()
-    assert "18 recargas sem dono" in html and "136,66 kWh" in html
+    assert "72 recargas sem dono" in html and "570,17 kWh" in html
     assert "Partida sem cartão" in html
 
     orfa = ChargingSession.objects.filter(source="semsplus_log", energy_kwh="10.70").get()

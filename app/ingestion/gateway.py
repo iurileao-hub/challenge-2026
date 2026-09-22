@@ -74,8 +74,8 @@ from ingestion.models import IngestionRun, RawEvent
 
 #: Duas fontes diferentes descrevendo a MESMA sessao fisica nao concordam no
 #: segundo: a nuvem carimba quando recebeu, a borda quando leu o registrador.
-#: Dentro desta janela, no mesmo conector, e a mesma sessao -- dois carros nao
-#: iniciam recarga no mesmo cabo com dois minutos de diferenca.
+#: Dentro desta janela, no mesmo conector e sem uma terminar antes da outra, e a
+#: mesma sessao. So a janela nao basta: ver `_find_existing` e o dado de 28/07.
 CLOCK_TOLERANCE = timedelta(seconds=120)
 
 #: Relogio de equipamento sem NTP produz datas absurdas. Um dia de folga cobre
@@ -505,15 +505,18 @@ class IngestionGateway:
             found = ChargingSession.objects.filter(source=source, source_ref=cs.source_ref).first()
             if found:
                 return found
-        return (
-            ChargingSession.objects.filter(
-                charge_point=point,
-                session_start__gte=cs.session_start - CLOCK_TOLERANCE,
-                session_start__lte=cs.session_start + CLOCK_TOLERANCE,
-            )
-            .order_by("session_start")
-            .first()
+        perto = ChargingSession.objects.filter(
+            charge_point=point,
+            session_start__gte=cs.session_start - CLOCK_TOLERANCE,
+            session_start__lte=cs.session_start + CLOCK_TOLERANCE,
         )
+        # Inicio proximo nao basta: se uma terminou antes de a outra comecar, sao
+        # duas. O HCA G2 real fez isso em 28/07/2026: tentativa de 0 kWh e, 76 s
+        # depois, recarga de 15,52 kWh -- que a janela sozinha descartava.
+        perto = perto.exclude(session_end__lt=cs.session_start)
+        if cs.session_end is not None:
+            perto = perto.exclude(session_start__gt=cs.session_end)
+        return perto.order_by("session_start").first()
 
     def _persist_session(self, cs: CanonicalSession, run, report):
         self._validate(cs)

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="100 testes" src="https://img.shields.io/badge/testes-100%20passando-2ea44f?style=flat-square">
+  <img alt="106 testes" src="https://img.shields.io/badge/testes-106%20passando-2ea44f?style=flat-square">
   <img alt="14 entidades" src="https://img.shields.io/badge/esquema-14%20entidades-0f6b4f?style=flat-square">
   <img alt="Detecção de anomalias medida por curva de sensibilidade" src="https://img.shields.io/badge/detecção%20de%20anomalias-medida%20por%20curva%20de%20sensibilidade-0f6b4f?style=flat-square">
   <img alt="Sprint 2 entregue" src="https://img.shields.io/badge/Sprint%202-entregue-2ea44f?style=flat-square">
@@ -19,7 +19,7 @@
 Enterprise Challenge 2026, Sprints 1 e 2: a pesquisa, o desenho e a implementação do **EV ChargeOps**, plataforma que transforma sessões de recarga de veículos elétricos em infraestrutura compartilhada (condomínios, edifícios corporativos, campi) em dados estruturados, rateio justo e inteligência acionável. A Sprint 1 produziu os três dossiês de pesquisa e o contrato de arquitetura; a Sprint 2 implementou a plataforma, que roda em [`app/`](app/).
 
 > [!IMPORTANT]
-> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **100 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
+> **As duas sprints estão concluídas.** A Sprint 1 entregou a pesquisa e o contrato de arquitetura. A **Sprint 2 está implementada, testada e rodando**: aplicação Django sobre PostgreSQL em [`app/`](app/), com **106 testes verdes**, dos quais 19 reproduzem linha a linha o mês fictício que o dossiê fechou antes de existir código.
 
 ### Dois READMEs, dois propósitos
 
@@ -96,7 +96,7 @@ O achado que define a arquitetura: **o carregador GoodWe HCA G2 não documenta O
 
 No mapeamento regulatório (Opção A), seguimos uma regra inegociável: **toda afirmação sobre norma vem do texto oficial, baixado do site do órgão e preservado no repositório** — sínteses de terceiros serviram apenas para descobrir que uma norma existe. Quatro camadas incidem sobre a operação: a REN ANEEL 1.000/2021 (arts. 550–560: comunicação prévia à distribuidora, protocolos abertos para equipamentos de uso não exclusivamente privado, permissão expressa de exploração comercial a preços livres, vedação de V2G); a Lei estadual 18.403/2026 (direito do condômino à recarga na vaga privativa); a IT-41 do Corpo de Bombeiros de SP, atualizada pela Portaria CCB-003/970/2026 (somente modos 3 e 4 em áreas internas, circuito exclusivo com DR individual, desligamento de emergência interligado ao alarme de incêndio, homologação ANATEL da comunicação sem fio); e a Lei municipal paulistana 17.336/2020 — que exige, em novos edifícios, recarga com *medição individualizada e cobrança*, ou seja, a especificação legal do núcleo do nosso produto. O dossiê traz o mapa norma → artigo → obrigação → impacto e a avaliação de conformidade da solução, item a item. Destaque da nossa leitura: o art. 552 (protocolos abertos) favorece a arquitetura OCPP-compatível mesmo sem acesso à API do fabricante — conformidade de espírito, não só de letra.
 
-Nas APIs complementares (Opção C), testamos por chamada real (respostas brutas preservadas em `data/`): a Open Charge Map, que dá o contexto competitivo público ao redor de cada condomínio, e a ANEEL Dados Abertos, de onde extraímos a tarifa homologada vigente da Enel SP (R$ 0,7252/kWh, grupo B3 convencional, sem tributos, REH 3.477/2025) — a âncora auditável do motor de rateio. As chamadas reais renderam quatro pegadinhas de engenharia que nenhum manual documenta (o agente se chama "ELETROPAULO", valores em string com vírgula em R$/MWh, base tarifária correta, exclusão das linhas SCEE) — cada uma seria um bug silencioso na Sprint 2.
+Nas APIs complementares (Opção C), testamos por chamada real (respostas brutas preservadas em `data/`): a Open Charge Map, que dá o contexto competitivo público ao redor de cada condomínio, e a ANEEL Dados Abertos, de onde extraímos a tarifa homologada vigente da Enel SP (R$ 0,7252/kWh, grupo B3 convencional, sem tributos, REH 3.477/2025; desde 04/07/2026, R$ 0,7894/kWh pela REH 3.596/2026, conforme consulta de 22/09/2026) — a âncora auditável do motor de rateio. As chamadas reais renderam quatro pegadinhas de engenharia que nenhum manual documenta (o agente se chama "ELETROPAULO", valores em string com vírgula em R$/MWh, base tarifária correta, exclusão das linhas SCEE) — cada uma seria um bug silencioso na Sprint 2.
 
 ## Frente 3 — Arquitetura e IA
 
@@ -222,7 +222,7 @@ possível linha a linha.
 O mês fictício de junho/2026 virou **suíte de aceitação**: 19 testes reproduzem as três
 faturas (R$ 53,21, R$ 66,76 e R$ 72,33), os agregados (203,120 kWh, R$ 327,30) e os ajustes
 de reconciliação (R$ 37,54). Os valores esperados foram copiados do documento da Sprint 1,
-escrito meses antes do código, e não lidos da implementação. São 100 testes no total.
+escrito meses antes do código, e não lidos da implementação. São 106 testes no total.
 
 ### O que a implementação ensinou e a pesquisa não tinha visto
 
@@ -293,10 +293,12 @@ de quem responde por ela.
 
 ### Limites declarados
 
-O primeiro dado real atravessou o pipeline: as 18 sessões do HCA G2 do laboratório da FIAP,
-observadas no SEMS+ (136,66 kWh), entram pelo mesmo gateway que as demais fontes. O limite
-que resta é de outra natureza. Esse dado é observação da tela da plataforma, de nível [O], e
-não resposta de uma chamada autenticada à API, que segue negada. Os números são reais; o
+O primeiro dado real atravessou o pipeline: as 72 sessões do HCA G2 do laboratório da FIAP,
+de 27/05 a 22/09/2026 (570,17 kWh), lidas no SEMS+, entram pelo mesmo gateway que as demais
+fontes. Todas sem dono, por partida automática: R$ 438,21 de energia que ninguém ressarciu.
+O limite que resta é de outra natureza. Esse dado é o JSON que o cliente web da plataforma
+recebe, lido com sessão logada, de nível [O], e não resposta de uma chamada autenticada à
+API de desenvolvedor, que segue negada. Os números são reais; o
 formato de transporte definitivo ainda é desconhecido. Por isso cada adaptador separa de onde
 o dado vem do que cada campo significa: no dia da credencial, troca-se o primeiro.
 
@@ -413,4 +415,4 @@ Todas as fontes abaixo foram efetivamente consultadas pela equipe, com acesso ve
 
 ### Observação direta da plataforma (nível [O])
 
-72. GoodWe — plataforma de monitoramento **SEMS+** (`semsplus.goodwe.com`): acesso de monitoramento à planta real "LAB FIAP Eco Smart Home" (carregador HCA G2, SN 57000HPA247L0002), concedido à conta da equipe em **2026-06-26**. Observação de primeira mão da interface web e da API web do carregador (endpoints capturados no painel de rede — URL/método/status — e campos exibidos na interface, 18 sessões reais); inventário de endpoints e histórico de sessões em [docs/frente-2-sems-plus-acesso.md](docs/frente-2-sems-plus-acesso.md).
+72. GoodWe — plataforma de monitoramento **SEMS+** (`semsplus.goodwe.com`): acesso de monitoramento à planta real "LAB FIAP Eco Smart Home" (carregador HCA G2, SN 57000HPA247L0002), concedido à conta da equipe em **2026-06-26**. Observação de primeira mão da interface web e da API web do carregador (endpoints capturados no painel de rede — URL/método/status — e campos exibidos na interface, 18 sessões reais); em **2026-09-22**, corpo JSON da resposta de `queryChargeLogList` lido no cliente web logado (72 sessões, 27/05 a 22/09/2026); inventário de endpoints e histórico de sessões em [docs/frente-2-sems-plus-acesso.md](docs/frente-2-sems-plus-acesso.md).

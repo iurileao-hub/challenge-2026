@@ -69,6 +69,8 @@ Todos sob `https://us-gateway.semsportal.com`, capturados ao abrir a planta e a 
 
 ## Histórico de sessões encerradas (`queryChargeLogList`)
 
+> Registro da coleta de 26/06/2026, transcrito da tela. A coleta de 22/09/2026, lida do JSON e com 72 sessões, está na seção seguinte.
+
 Intervalo consultado na tela "Registo de carregamento": **28/05/2026 → 26/06/2026**. 18 sessões retornadas. Em todas, `ID do cartão` = `57000HPA247L0002` (o próprio SN — assinatura de **auto-start**, partida sem cartão) e `porta de carregamento` = `1`.
 
 | # | Início | Fim | Duração | Energia (kWh) | ≈ Autonomia (km) |
@@ -97,6 +99,41 @@ Intervalo consultado na tela "Registo de carregamento": **28/05/2026 → 26/06/2
 - **Sessão de 0 kWh** (#8, 37 min): conexão sem entrega de energia — borda de "sessão abortada" que o esquema de ingestão precisa tolerar.
 - **Janela noturna predominante:** a maioria começa entre 19h e 23h e cruza a meia-noite — útil para a curva de carga e para o estudo de demanda exigido pela IT-41 (item 5.9.4).
 - **Duas sessões no mesmo dia** (#11 e #12, 10/06): o `porta de carregamento` e o intervalo distinguem sessões consecutivas no mesmo equipamento.
+
+## Coleta de 22/09/2026: o JSON que a tela recebe
+
+**Método.** Com a mesma conta de monitoramento, a equipe abriu a tela "Charging Record" do carregador e leu, no painel de rede do navegador, o **corpo da resposta** de `POST /web/sems/sems-plant/api/v1/chargePile/queryChargeLogList`. É a chamada que o próprio cliente web faz, com a sessão logada; **não** é a OpenAPI de desenvolvedor, que segue negada. Nível de evidência: [O], um degrau acima da coleta de 26/06, porque agora se lê o dado estruturado que o servidor entrega, e não o que a tela renderiza. A tela limita o intervalo e pagina de 20 em 20, então foram quatro respostas, em janelas que se sobrepõem:
+
+| Arquivo bruto (`data/semsplus_raw/`, fora do repo) | Janela consultada | Sessões |
+|---|---|---|
+| `sems_jun.json` | 28/05 a 26/06/2026 | 19 |
+| `sems_p1.json` + `sems_p2.json` | 26/06 a 24/08/2026 (duas páginas) | 33 |
+| `sems_recent.json` | 24/08 a 22/09/2026 | 20 |
+
+Deduplicadas pelo identificador de sessão (`chargeSerialNumber`): **72 sessões únicas, de 27/05/2026 20:55 a 22/09/2026 03:39 (início da última), 570,17 kWh.** Em todas, `chargeCardNumber` = `57000HPA247L0002`: partida automática, sem dono. O arquivo versionado é [`data/semsplus_charge_log.csv`](../data/semsplus_charge_log.csv), com os nomes de campo e os valores exatamente como vieram (o gerador lê números como texto para não passar pelo `float`); regenera-se com `cd app && uv run python -m ingestion.semsplus_raw ../data/semsplus_raw/*.json`.
+
+| Mês (pelo início) | Sessões | kWh |
+|---|---|---|
+| mai/2026 | 2 | 22,41 |
+| jun/2026 | 19 | 137,76 |
+| jul/2026 | 18 | 167,77 |
+| ago/2026 | 16 | 130,68 |
+| set/2026 (até dia 22) | 17 | 111,55 |
+| **Total** | **72** | **570,17** |
+
+**Conferência com a transcrição de 26/06.** As 18 sessões da tabela acima estão no JSON com início, fim, energia, cartão e porta idênticos: **18 de 18, zero divergência.** A 19ª da janela de junho (27/05 20:55 a 28/05 00:41, 8,12 kWh) ficou de fora da transcrição porque começou antes do intervalo consultado. O CSV de junho continua no repo como registro daquela coleta.
+
+**Campos da resposta** (um objeto por sessão): `chargeStartTime` e `chargeEndTime` (hora local da planta, sem fuso, formato `AAAA-MM-DD HH:MM:SS.000`), `currentChargeQuantity` (kWh, duas casas), `chargeSerialNumber`, `chargeCardNumber`, `chargePileSN`, `charGun` e `chargeMuzzle` (porta), `chargeTimeLength` (minutos), `mileage` (km, sempre energia × 5), `greenElec`, `purElec`, `chargeEndCause`, e as unidades `unit` e `chartUnit`.
+
+**Achados, sem ir além do que o dado mostra:**
+
+1. **`chargeSerialNumber` é um id de sessão.** É o SN seguido de um carimbo de tempo alguns segundos anterior ao início (ex.: `57000HPA247L000220260625205255`, 20:52:55, para a sessão que começa em 25/06 às 20:53:03). Único nas 72. Vira a chave de idempotência da ingestão (`source_ref`): reentregar páginas sobrepostas não duplica recarga.
+2. **`chargeEndCause` = `"abnormal_stop"` em 100% das sessões**, inclusive recargas completas de sete horas. Hoje o campo não distingue nada, e a plataforma não o traduz em motivo de encerramento.
+3. **`greenElec` e `purElec`: semântica desconhecida.** Em 70 das 72 sessões, `greenElec` é a energia total truncada a uma casa, e `purElec` é 0 em todas, inclusive nas sessões que começam de madrugada (02:06, 03:37, 03:39) e nas 50 que começam entre 19h e 23h. As duas exceções têm `greenElec` = 0: 10/06 21:23 (3,53 kWh) e 20/08 21:09 (12,77 kWh). A tela chama as séries de "Carregamento de energia verde" e "Carregamento de rede", mas com energia "verde" à noite não dá para ler isso como geração solar. **Não afirmamos "100% solar".** Fica como pergunta à GoodWe: o que os dois campos medem, e por que a planta de laboratório reporta tudo como "verde".
+4. **Quatro sessões com 0,00 kWh** (14/06, com 37 min; 28/07; e duas em 22/09) e uma com 0,01 kWh (14/09). Entram como vieram.
+5. **Duas recargas podem começar com segundos de diferença.** Em 28/07, uma tentativa de 0 kWh (17:13:14 a 17:13:34) e, 76 segundos depois, a recarga real de 15,52 kWh. O gateway tratava início a menos de dois minutos no mesmo conector como a mesma sessão e descartava a segunda como duplicata. Agora só é a mesma sessão se nenhuma das duas tiver terminado antes de a outra começar (`_find_existing` em `app/ingestion/gateway.py`; teste `test_duas_recargas_com_inicio_a_76_segundos_nao_viram_uma`).
+
+**Quanto isso custa ao condomínio.** Pelo motor de rateio, em `Decimal`, com o centavo arredondado por sessão e a tarifa da vigência de cada recarga (REH 3.477/2025, R$ 0,7252/kWh, para as 23 que começaram até 03/07; REH 3.596/2026, R$ 0,7894/kWh, para as 49 a partir de 04/07): **R$ 438,21 de energia sem dono**, sem tributos. A vigência se decide pela data de início, a mesma regra da competência; por isso a recarga de 03/07 19:58, que terminou em 04/07, fica na tarifa antiga.
 
 ## Evidência visual (screenshots)
 

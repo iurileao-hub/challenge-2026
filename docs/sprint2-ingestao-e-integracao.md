@@ -6,7 +6,7 @@
 
 1. O back-end aceita o dado em três formatos de entrega: lote consultado (pull), eventos entregues (push por webhook assinado) e fluxo de um gateway de borda. Os três passam pelo mesmo gateway e saem no mesmo formato.
 2. A ingestão é idempotente, tolera evento repetido e fora de ordem, isola falha por registro e guarda em quarentena reprocessável tudo o que recusa. Cada garantia tem um teste com o nome da garantia.
-3. O primeiro dado real atravessou o pipeline: as 18 sessões do HCA G2 do laboratório da FIAP (136,66 kWh). Todas chegaram sem dono, porque o carregador operava em partida automática.
+3. O primeiro dado real atravessou o pipeline: as 72 sessões do HCA G2 do laboratório da FIAP, de 27/05 a 22/09/2026 (570,17 kWh). Todas chegaram sem dono, porque o carregador operava em partida automática: R$ 438,21 sem ter de quem cobrar.
 4. Recomendamos dois caminhos melhores que a consulta periódica à nuvem: **eventos por webhook com pull de reconciliação** (curto prazo, custo baixo para a GoodWe) e **gateway de borda Modbus com medidor MID** (onde a cobrança exigir lastro metrológico).
 5. O problema mais importante que o dado real revelou não é de transporte. É de identidade: qualquer arquitetura que não entregue quem iniciou a recarga produz energia sem dono.
 
@@ -14,7 +14,7 @@
 
 Três níveis de evidência, mantendo a convenção dos dossiês da Sprint 1:
 
-- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (100 testes).
+- **Verificado no código.** Toda afirmação sobre o que a plataforma faz aponta para um arquivo e para um teste em `app/ingestion/tests/`. A suíte roda com `uv run pytest` (106 testes).
 - **Verificado na Sprint 1.** O que se afirma sobre o HCA G2 e o SEMS+ vem dos dossiês já entregues, que citam fonte primária: [`frente-2-regulatorio.md`](frente-2-regulatorio.md) (datasheet e manual G2 V1.5) e [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md) (observação direta da plataforma, nível [O]). Nenhuma fonte nova é citada aqui.
 - **Inferência da equipe.** As arquiteturas propostas são desenho nosso. Não tivemos acesso ao mapa de registradores Modbus do HCA G2 nem à OpenAPI de desenvolvedor do SEMS. Onde uma proposta depende de algo que não pudemos verificar, o texto diz.
 
@@ -61,12 +61,14 @@ A fronteira entre a ingestão e a IA é explícita: **o gateway recusa o que é 
 
 ### O que o dado real ensinou
 
-As 18 sessões do HCA G2 (SN 57000HPA247L0002) observadas no SEMS+ entram por `manage.py ingest semsplus_log`, ou pela primeira etapa do `manage.py pipeline`. São observação da tela da plataforma, nível [O], e não resposta de API autenticada. Os números são reais; o formato de transporte ainda não é o definitivo. Quatro coisas que dado sintético não ensinaria:
+As sessões do HCA G2 (SN 57000HPA247L0002) coletadas no SEMS+ entram por `manage.py ingest semsplus_log`, ou pela primeira etapa do `manage.py pipeline`. A primeira coleta (26/06/2026) transcreveu 18 sessões da tela; a segunda (22/09/2026) leu o JSON que o cliente web recebe e trouxe 72, de 27/05 a 22/09/2026, com as 18 da primeira conferidas sem divergência (método e achados em [`frente-2-sems-plus-acesso.md`](frente-2-sems-plus-acesso.md)). É nível [O], e não resposta de API de desenvolvedor autenticada. Os números são reais; o formato de transporte ainda não é o definitivo. Seis coisas que dado sintético não ensinaria:
 
 1. **A fonte não reporta medidor acumulado**, só início, fim e energia. O modelo canônico exigia `meter_start`. Era premissa nossa, não propriedade dos carregadores, e virou opcional. Junto foi corrigida a confusão entre "a fonte não informa medidor" e "a leitura final se perdeu", que reteria para sempre a fatura de todo morador.
-2. **Todas as sessões chegaram sem dono.** O "ID do cartão" é o próprio número de série: assinatura de partida automática. São R$ 99,11 de energia que o condomínio pagaria na conta de luz sem ter de quem cobrar.
+2. **Todas as sessões chegaram sem dono.** O "ID do cartão" é o próprio número de série: assinatura de partida automática. Nas 72 sessões são 570,17 kWh e R$ 438,21 (pela tarifa da vigência de cada recarga: R$ 0,7252 até 03/07/2026 e R$ 0,7894 desde 04/07, REH 3.596/2026) que o condomínio pagaria na conta de luz sem ter de quem cobrar. Na primeira coleta, com 18 sessões, eram R$ 99,11.
 3. **Ausência de dado não é zero.** Sem potência informada, a primeira rodada do Isolation Forest acusou 17 das 18 recargas reais de "potência zero". A fase 2 da detecção passou a se abster sem telemetria, como a regra de ociosidade já fazia.
-4. **Sessão de 0 kWh existe** (37 minutos conectado, nenhuma energia). Entra como veio.
+4. **Sessão de 0 kWh existe** (quatro em 72; uma delas, 37 minutos conectado, nenhuma energia). Entra como veio.
+5. **A fonte tem id de sessão.** O `chargeSerialNumber` do JSON (o SN seguido de um carimbo de tempo) virou a referência de idempotência: páginas de consulta que se sobrepõem não duplicam recarga.
+6. **Duas recargas podem começar com 76 segundos de diferença.** Em 28/07, uma tentativa de 0 kWh e logo depois uma recarga de 15,52 kWh no mesmo conector. A tolerância de relógio do gateway, sozinha, descartava a segunda como duplicata. Agora início próximo só é a mesma sessão se nenhuma das duas terminou antes de a outra começar.
 
 ## 2. O contrato que a plataforma pede
 
@@ -144,7 +146,7 @@ As três formas acima são pontes. O destino, que depende do roteiro de firmware
 
 **A recomendação é uma sequência, não uma escolha.** B primeiro, porque custa pouco para a GoodWe, nada para o condomínio, e destrava o que o produto tem de mais visível, que é agir durante a recarga. C onde o condomínio for cobrar com rigor de medição ou onde a assembleia exigir independência do fabricante. A permanece como rede de segurança das duas. A ordem importa porque cada passo se paga sozinho e nenhum é desperdiçado quando o seguinte chega: o back-end é o mesmo.
 
-**O achado que muda a conversa é o da identidade.** Entramos na Sprint 2 tratando a integração como problema de transporte. O dado real mostrou outro gargalo: 18 de 18 sessões sem dono, não por falha de rede, e sim porque o carregador estava em partida automática, um dos três métodos que o datasheet oferece. Para uso doméstico, é o modo certo. Para uso compartilhado, transforma toda recarga em custo do condomínio. A pergunta mais útil que podemos levar à GoodWe não é "qual API vocês vão abrir?", e sim "existe um modo de operação em que a partida automática fica desabilitada e todo início de sessão exige cartão ou app?". Se existir, é configuração. Se não existir, é o requisito de produto que separa um wallbox residencial de um carregador de condomínio. Enquanto isso, a plataforma trata o caso em vez de escondê-lo: a sessão órfã fica visível, com o valor em reais, e o gestor atribui dono a cada recarga sem apagar o que o equipamento reportou.
+**O achado que muda a conversa é o da identidade.** Entramos na Sprint 2 tratando a integração como problema de transporte. O dado real mostrou outro gargalo: 72 de 72 sessões sem dono, não por falha de rede, e sim porque o carregador estava em partida automática, um dos três métodos que o datasheet oferece. Para uso doméstico, é o modo certo. Para uso compartilhado, transforma toda recarga em custo do condomínio. A pergunta mais útil que podemos levar à GoodWe não é "qual API vocês vão abrir?", e sim "existe um modo de operação em que a partida automática fica desabilitada e todo início de sessão exige cartão ou app?". Se existir, é configuração. Se não existir, é o requisito de produto que separa um wallbox residencial de um carregador de condomínio. Enquanto isso, a plataforma trata o caso em vez de escondê-lo: a sessão órfã fica visível, com o valor em reais, e o gestor atribui dono a cada recarga sem apagar o que o equipamento reportou.
 
 **O que a robustez custou.** O esquema de domínio continua com as 14 entidades da Frente 3. A ingestão ganhou duas tabelas operacionais (diário de execuções e registro bruto) que não descrevem o condomínio, e sim o que aconteceu na porta de entrada. `charging_session` ganhou dois campos de proveniência e uma restrição de unicidade. A aposta da Sprint 1, de que o esquema aguentaria o dado real sem entidade de emergência, segue ganha, com uma correção honesta: um campo que julgávamos universal, o medidor inicial, não era.
 

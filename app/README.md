@@ -31,12 +31,12 @@
 
 | Requisito | Versão | Por que essa versão |
 |---|---|---|
-| Python | 3.12 ou superior | Fixado em `.python-version` e `pyproject.toml` |
-| PostgreSQL | **13 ou superior** (testado em 16) | A migração `0002` usa `EXCLUSION CONSTRAINT` com a extensão `btree_gist`. A partir do PG 13 essa extensão é *trusted*, o que permite ao dono do banco instalá-la sem ser superusuário. Em versões anteriores o `migrate` falha pedindo superusuário |
+| Python | 3.14 ou superior | Fixado em `.python-version` e `pyproject.toml` |
+| PostgreSQL | **14 ou superior** (testado em 16) | O Django 5.2 recusa conectar em versão anterior. A migração `0002` usa `EXCLUSION CONSTRAINT` com a extensão `btree_gist`, que é *trusted* desde o PG 13: o dono do banco a instala sem ser superusuário |
 | [uv](https://docs.astral.sh/uv/) | qualquer recente | Gerenciador de dependências e de ambiente virtual. O `uv.lock` versionado garante que todo mundo instale exatamente as mesmas versões |
 
 **Python não precisa ser instalado à mão.** O `uv` lê o `.python-version`, baixa a
-versão 3.12 se ela não existir na máquina e cria o ambiente virtual sozinho. Basta
+versão 3.14 se ela não existir na máquina e cria o ambiente virtual sozinho. Basta
 instalar o `uv` e o PostgreSQL.
 
 <details open>
@@ -531,7 +531,8 @@ trabalho e nunca observou um condomínio.
 | `role "postgres" does not exist` (macOS) | O Homebrew usa o seu usuário como administrador | Usar `psql -d postgres -c ...`, sem `sudo -u postgres` |
 | `psql` não reconhecido (Windows) | O instalador não adicionou ao PATH | Adicionar `C:\Program Files\PostgreSQL\16\bin` ao PATH, ou usar o "SQL Shell (psql)" do menu Iniciar |
 | `uv sync` demora muitos minutos (WSL2) | O projeto está em `/mnt/c/` | Mover o repositório para dentro do sistema de arquivos do WSL (`~/`) |
-| `permission denied to create extension "btree_gist"` | PostgreSQL 12 ou anterior | A extensão só é *trusted* a partir do PG 13. Atualizar o PostgreSQL, ou instalar a extensão como superusuário antes do `migrate`: `sudo -u postgres psql -d chargeops -c "CREATE EXTENSION btree_gist;"` |
+| `NotSupportedError: PostgreSQL 14 or later is required (found 13.x)` | PostgreSQL 13 ou anterior | O Django 5.2 só conecta a partir do PG 14. Atualizar o PostgreSQL |
+| `permission denied to create extension "btree_gist"` | O banco não pertence ao usuário `chargeops` (criado sem `OWNER chargeops`) | Extensão *trusted* exige privilégio `CREATE` no banco, que o dono tem. Recriar o banco com `OWNER chargeops`, ou instalar a extensão como superusuário antes do `migrate`: `sudo -u postgres psql -d chargeops -c "CREATE EXTENSION btree_gist;"` |
 | `Error: That port is already in use.` | Já existe um servidor na 8000 | Usar outra porta: `uv run python manage.py runserver 8001` |
 | `uv: command not found` | O instalador não está no PATH | `export PATH="$HOME/.local/bin:$PATH"` |
 | `pipeline` não fecha fatura nenhuma | Banco sem dados na competência pedida | Rodar `seed_demo --months 6 --reset` antes, ou passar a competência certa em `--competencia` |

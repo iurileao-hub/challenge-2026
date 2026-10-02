@@ -32,7 +32,7 @@
 | Requisito | Versão | Por que essa versão |
 |---|---|---|
 | Python | 3.14 ou superior | Fixado em `.python-version` e `pyproject.toml` |
-| PostgreSQL | **14 ou superior** (testado em 16) | O Django 5.2 recusa conectar em versão anterior. A migração `0002` usa `EXCLUSION CONSTRAINT` com a extensão `btree_gist`, que é *trusted* desde o PG 13: o dono do banco a instala sem ser superusuário |
+| PostgreSQL | **14 ou superior** (testado em 16 e 18) | O Django 5.2 recusa conectar em versão anterior. A migração `0002` usa `EXCLUSION CONSTRAINT` com a extensão `btree_gist`, que é *trusted* desde o PG 13: o dono do banco a instala sem ser superusuário |
 | [uv](https://docs.astral.sh/uv/) | qualquer recente | Gerenciador de dependências e de ambiente virtual. O `uv.lock` versionado garante que todo mundo instale exatamente as mesmas versões |
 
 **Python não precisa ser instalado à mão.** O `uv` lê o `.python-version`, baixa a

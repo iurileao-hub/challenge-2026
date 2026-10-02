@@ -3,7 +3,7 @@
 <p align="center">
   <img alt="Python 3.14" src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Django 5.2" src="https://img.shields.io/badge/Django-5.2-092E20?style=flat-square&logo=django&logoColor=white">
-  <img alt="PostgreSQL 16" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white">
+  <img alt="PostgreSQL 16 e 18" src="https://img.shields.io/badge/PostgreSQL-16%20e%2018-4169E1?style=flat-square&logo=postgresql&logoColor=white">
   <img alt="scikit-learn 1.9" src="https://img.shields.io/badge/scikit--learn-1.9-F7931E?style=flat-square&logo=scikitlearn&logoColor=white">
   <img alt="pandas 3.0" src="https://img.shields.io/badge/pandas-3.0-150458?style=flat-square&logo=pandas&logoColor=white">
 </p>
@@ -178,7 +178,7 @@ Total estimado: 13–17 dias ativos. A ordem é deliberada: dados antes de tudo 
 ## Sprint 2: a plataforma implementada
 
 O plano acima foi executado. O código está em [`app/`](app/), com instruções de execução no
-[README da aplicação](app/README.md). Python 3.14, Django 5.2, PostgreSQL 16, pandas e
+[README da aplicação](app/README.md). Python 3.14, Django 5.2, PostgreSQL (testado em 16 e 18), pandas e
 scikit-learn: as tecnologias que a Sprint 1 escolheu, sem substituição. O framework web ficou
 em **Django**, pela velocidade nas etapas de interface.
 

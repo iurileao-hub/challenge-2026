@@ -61,11 +61,11 @@ Com [Homebrew](https://brew.sh/):
 
 ```bash
 brew install uv
-brew install postgresql@16
-brew services start postgresql@16
+brew install postgresql@18
+brew services start postgresql@18
 
 # o Homebrew não põe os binários do postgres no PATH por padrão:
-echo 'export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -99,7 +99,7 @@ acesso a disco é ordens de grandeza mais lento e o `uv sync` demora minutos.
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 # PostgreSQL: instalador oficial (marque "Add to PATH" no instalador)
-winget install PostgreSQL.PostgreSQL.16
+winget install PostgreSQL.PostgreSQL.18
 ```
 
 O instalador pede uma senha para o superusuário `postgres`. Guarde: ela é pedida em todo
@@ -153,7 +153,7 @@ psql -U postgres -c "CREATE DATABASE chargeops OWNER chargeops;"
 ```
 
 Se `psql` não for reconhecido, o instalador não o pôs no PATH. O caminho costuma ser
-`C:\Program Files\PostgreSQL\16\bin`. No WSL2, use os comandos da aba Linux.
+`C:\Program Files\PostgreSQL\18\bin`. No WSL2, use os comandos da aba Linux.
 </details>
 
 **Passos 2 a 5: iguais nos três sistemas.** O `uv` cuida das diferenças de ambiente.
@@ -524,12 +524,12 @@ trabalho e nunca observou um condomínio.
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| `connection to server at "127.0.0.1", port 5432 failed` | PostgreSQL não está rodando | Linux: `sudo systemctl start postgresql`. macOS: `brew services start postgresql@16`. Windows: iniciar o serviço `postgresql-x64-16` em `services.msc` |
+| `connection to server at "127.0.0.1", port 5432 failed` | PostgreSQL não está rodando | Linux: `sudo systemctl start postgresql`. macOS: `brew services start postgresql@18`. Windows: iniciar o serviço `postgresql-x64-18` em `services.msc` |
 | `FATAL: role "chargeops" does not exist` | O passo 1 não foi executado | Rodar os dois comandos `psql` do passo 1, na variante do seu sistema |
 | Portal responde **404 em todas as telas** logo após um login bem-sucedido | O login existe, mas não está vinculado a uma pessoa do condomínio (o vínculo é feito pelo `seed_demo`) | `seed_demo --months 6 --reset` e `pipeline --reconciliar` |
-| `psql: command not found` (macOS) | O Homebrew não põe o PostgreSQL 16 no PATH | `export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"` (Intel: `/usr/local/opt/...`) |
+| `psql: command not found` (macOS) | O Homebrew não põe o PostgreSQL 18 no PATH | `export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"` (Intel: `/usr/local/opt/...`) |
 | `role "postgres" does not exist` (macOS) | O Homebrew usa o seu usuário como administrador | Usar `psql -d postgres -c ...`, sem `sudo -u postgres` |
-| `psql` não reconhecido (Windows) | O instalador não adicionou ao PATH | Adicionar `C:\Program Files\PostgreSQL\16\bin` ao PATH, ou usar o "SQL Shell (psql)" do menu Iniciar |
+| `psql` não reconhecido (Windows) | O instalador não adicionou ao PATH | Adicionar `C:\Program Files\PostgreSQL\18\bin` ao PATH, ou usar o "SQL Shell (psql)" do menu Iniciar |
 | `uv sync` demora muitos minutos (WSL2) | O projeto está em `/mnt/c/` | Mover o repositório para dentro do sistema de arquivos do WSL (`~/`) |
 | `NotSupportedError: PostgreSQL 14 or later is required (found 13.x)` | PostgreSQL 13 ou anterior | O Django 5.2 só conecta a partir do PG 14. Atualizar o PostgreSQL |
 | `permission denied to create extension "btree_gist"` | O banco não pertence ao usuário `chargeops` (criado sem `OWNER chargeops`) | Extensão *trusted* exige privilégio `CREATE` no banco, que o dono tem. Recriar o banco com `OWNER chargeops`, ou instalar a extensão como superusuário antes do `migrate`: `sudo -u postgres psql -d chargeops -c "CREATE EXTENSION btree_gist;"` |
